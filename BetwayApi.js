@@ -81,4 +81,4 @@ class BetwayAPI {
       });
   }
 }
-export default BetwayApi;
+export default BetwayAPI;
