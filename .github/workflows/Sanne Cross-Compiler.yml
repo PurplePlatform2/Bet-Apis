@@ -1,4 +1,4 @@
-name: Sanne Cross-Platform Builder
+name: Sanne Android Builder
 
 on:
   push:
@@ -11,48 +11,46 @@ env:
   DEFAULT_APP_NAME: "SanneWebApp"
   DEFAULT_PACKAGE_NAME: "com.sanne.webapp"
   DEFAULT_LOGO: "https://picsum.photos/512"
-  DEFAULT_VERSION: "1.0.0"
 
 defaults:
   run:
     shell: bash
 
 jobs:
-
-# ================= ANDROID =================
   android:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
+      # ☕ Java 17 (required for latest Android Gradle)
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
+      # 📱 Android SDK
       - uses: android-actions/setup-android@v3
 
-      # 🔍 Parse details.san
+      # 🔍 Parse details.san safely
       - name: Parse App Details
         run: |
           get_val() {
-            grep "^$1=" $DETAILS_FILE | cut -d'=' -f2 | head -n1
+            [ -f "$DETAILS_FILE" ] && grep "^$1=" "$DETAILS_FILE" | cut -d'=' -f2 | head -n1
           }
 
           APP_NAME=$(get_val appName)
           PACKAGE_NAME=$(get_val packageName)
           LOGO=$(get_val logo)
 
-          [ -z "$APP_NAME" ] && APP_NAME=$DEFAULT_APP_NAME
-          [ -z "$PACKAGE_NAME" ] && PACKAGE_NAME=$DEFAULT_PACKAGE_NAME
-          [ -z "$LOGO" ] && LOGO=$DEFAULT_LOGO
+          [ -z "$APP_NAME" ] && APP_NAME="$DEFAULT_APP_NAME"
+          [ -z "$PACKAGE_NAME" ] && PACKAGE_NAME="$DEFAULT_PACKAGE_NAME"
+          [ -z "$LOGO" ] && LOGO="$DEFAULT_LOGO"
 
           echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
           echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
           echo "LOGO=$LOGO" >> $GITHUB_ENV
 
-          # convert package → folder path
           PACKAGE_PATH=$(echo $PACKAGE_NAME | tr '.' '/')
           echo "PACKAGE_PATH=$PACKAGE_PATH" >> $GITHUB_ENV
 
@@ -62,12 +60,12 @@ jobs:
           mkdir build_app
           rsync -av --exclude='details.san' $APP_DIR/ build_app/
 
-      # 🎨 Prepare logo
+      # 🎨 Prepare logo (FIXED curl issue)
       - name: Prepare Logo
         run: |
           mkdir -p android/app/src/main/res/mipmap-xxxhdpi
 
-          if [[ "$LOGO" == http* ]]; then
+          if [[ "$LOGO" =~ ^https?:// ]]; then
             curl -L "$LOGO" -o icon.png
           elif [ -f "$APP_DIR/$LOGO" ]; then
             cp "$APP_DIR/$LOGO" icon.png
@@ -77,7 +75,7 @@ jobs:
 
           cp icon.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
-      # 🏗 Create Android project
+      # 🏗 Create project structure
       - name: Create Android Project
         run: |
           mkdir -p android/app/src/main/java/$PACKAGE_PATH
@@ -100,6 +98,7 @@ jobs:
           public class MainActivity extends Activity {
               WebView webView;
 
+              @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
 
@@ -114,6 +113,7 @@ jobs:
                   webView.loadUrl("file:///android_asset/index.html");
               }
 
+              @Override
               public void onBackPressed() {
                   if (webView.canGoBack()) webView.goBack();
                   else super.onBackPressed();
@@ -121,45 +121,74 @@ jobs:
           }
           EOF
 
-      # ⚙️ Android config
+      # ⚙️ Gradle + Android config (UPDATED)
       - name: Android Config
         run: |
+          mkdir -p android
+
+          # gradle.properties (FIX AndroidX error)
+          cat > android/gradle.properties << EOF
+          android.useAndroidX=true
+          android.enableJetifier=true
+          EOF
+
+          # settings.gradle
           cat > android/settings.gradle << EOF
           rootProject.name = "$APP_NAME"
           include ':app'
           EOF
 
+          # root build.gradle
           cat > android/build.gradle << 'EOF'
           buildscript {
-            repositories { google(); mavenCentral() }
-            dependencies { classpath 'com.android.tools.build:gradle:8.2.0' }
+            repositories {
+              google()
+              mavenCentral()
+            }
+            dependencies {
+              classpath 'com.android.tools.build:gradle:8.4.0'
+            }
           }
-          allprojects { repositories { google(); mavenCentral() } }
+
+          allprojects {
+            repositories {
+              google()
+              mavenCentral()
+            }
+          }
           EOF
 
+          # app build.gradle
           cat > android/app/build.gradle << EOF
-          plugins { id 'com.android.application' }
+          plugins {
+            id 'com.android.application'
+          }
 
           android {
             namespace "$PACKAGE_NAME"
-            compileSdk 34
+            compileSdk 35
 
             defaultConfig {
               applicationId "$PACKAGE_NAME"
               minSdk 21
-              targetSdk 34
+              targetSdk 35
               versionCode 1
               versionName "1.0"
             }
 
-            buildTypes { release { minifyEnabled false } }
+            buildTypes {
+              release {
+                minifyEnabled false
+              }
+            }
           }
 
           dependencies {
-            implementation 'androidx.appcompat:appcompat:1.6.1'
+            implementation 'androidx.appcompat:appcompat:1.7.0'
           }
           EOF
 
+      # 📄 Manifest
       - name: Manifest
         run: |
           cat > android/app/src/main/AndroidManifest.xml << EOF
@@ -172,7 +201,8 @@ jobs:
                 android:label="$APP_NAME"
                 android:icon="@mipmap/ic_launcher">
 
-              <activity android:name=".MainActivity">
+              <activity android:name=".MainActivity"
+                        android:exported="true">
                 <intent-filter>
                   <action android:name="android.intent.action.MAIN"/>
                   <category android:name="android.intent.category.LAUNCHER"/>
@@ -183,14 +213,14 @@ jobs:
           </manifest>
           EOF
 
-      # 🔨 Build
+      # 🔨 Build APK
       - name: Build APK
         run: |
           cd android
-          gradle wrapper
+          gradle wrapper --gradle-version 8.6
           ./gradlew assembleRelease
 
-      # 🔐 Sign
+      # 🔐 Sign APK
       - name: Sign APK
         run: |
           keytool -genkey -v -keystore keystore.jks \
@@ -208,106 +238,8 @@ jobs:
             --out signed.apk \
             "$APK"
 
+      # 📦 Upload
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
           path: signed.apk
-
-
-# ================= iOS =================
-  ios:
-    runs-on: macos-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Parse Details
-        run: |
-          APP_NAME=$(grep '^appName=' $DETAILS_FILE | cut -d'=' -f2)
-          [ -z "$APP_NAME" ] && APP_NAME=$DEFAULT_APP_NAME
-          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
-
-      - name: Copy App
-        run: |
-          mkdir ios_app
-          rsync -av --exclude='details.san' $APP_DIR/ ios_app/
-
-      - name: Create WKWebView App
-        run: |
-          mkdir -p ios/App
-
-          cat > ios/App/ViewController.swift << EOF
-          import UIKit
-          import WebKit
-
-          class ViewController: UIViewController {
-              var webView: WKWebView!
-
-              override func viewDidLoad() {
-                  super.viewDidLoad()
-
-                  webView = WKWebView(frame: self.view.frame)
-                  self.view.addSubview(webView)
-
-                  if let url = Bundle.main.url(forResource: "index", withExtension: "html") {
-                      webView.loadFileURL(url, allowingReadAccessTo: url)
-                  }
-              }
-          }
-          EOF
-
-      - name: Build iOS
-        run: |
-          xcodebuild -scheme App -configuration Release build || true
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ios-build
-          path: ios/
-
-
-# ================= DESKTOP =================
-  desktop:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Copy App
-        run: |
-          mkdir desktop
-          rsync -av --exclude='details.san' $APP_DIR/ desktop/
-
-      - name: Setup Electron
-        run: |
-          cd desktop
-          npm init -y
-          npm install electron electron-builder
-
-          cat > main.js << EOF
-          const { app, BrowserWindow } = require('electron');
-
-          function createWindow() {
-            const win = new BrowserWindow({
-              width: 900,
-              height: 700,
-              title: "$APP_NAME"
-            });
-            win.loadFile('index.html');
-          }
-
-          app.whenReady().then(createWindow);
-          EOF
-
-      - name: Build Desktop
-        run: |
-          cd desktop
-          npx electron-builder --linux --win --mac
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: desktop-builds
-          path: desktop/dist/
