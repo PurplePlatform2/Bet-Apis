@@ -1,3 +1,4 @@
 appName=Bet-AI
 packageName=com.sanne.betai
-appIcon=/app/src/logo.png
+logo=/app/src/logo.png
+version=1.01
