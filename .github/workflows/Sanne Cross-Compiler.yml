@@ -23,51 +23,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ☕ Java 17 (required for latest Android Gradle)
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      # 📱 Android SDK
       - uses: android-actions/setup-android@v4
 
-      # 🔍 Parse details.san safely
       - name: Parse App Details
         run: |
           get_val() {
             [ -f "$DETAILS_FILE" ] && grep "^$1=" "$DETAILS_FILE" | cut -d'=' -f2 | head -n1
           }
-
           APP_NAME=$(get_val appName)
           PACKAGE_NAME=$(get_val packageName)
           LOGO=$(get_val logo)
-
           [ -z "$APP_NAME" ] && APP_NAME="$DEFAULT_APP_NAME"
           [ -z "$PACKAGE_NAME" ] && PACKAGE_NAME="$DEFAULT_PACKAGE_NAME"
           [ -z "$LOGO" ] && LOGO="$DEFAULT_LOGO"
-
           echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
           echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
           echo "LOGO=$LOGO" >> $GITHUB_ENV
-
           PACKAGE_PATH=$(echo $PACKAGE_NAME | tr '.' '/')
           echo "PACKAGE_PATH=$PACKAGE_PATH" >> $GITHUB_ENV
 
-      # 📦 Copy app files
       - name: Copy App
         run: |
           mkdir build_app
           rsync -av --exclude='details.san' $APP_DIR/ build_app/
 
-      # 🎨 Prepare logo (FFmpeg conversion + densities)
       - name: Prepare Logo
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg imagemagick
-
           mkdir -p android/app/src/main/res
-
-          # Download or copy logo
           if [[ "$LOGO" =~ ^https?:// ]]; then
             curl -L "$LOGO" -o icon.tmp
           elif [ -f "$APP_DIR/$LOGO" ]; then
@@ -75,11 +63,7 @@ jobs:
           else
             curl -L "$DEFAULT_LOGO" -o icon.tmp
           fi
-
-          # Convert to PNG if not already valid PNG
           ffmpeg -y -i icon.tmp icon.png || convert icon.tmp -background none -flatten icon.png
-
-          # Generate all densities
           declare -A sizes=( ["mdpi"]=48 ["hdpi"]=72 ["xhdpi"]=96 ["xxhdpi"]=144 ["xxxhdpi"]=192 )
           for density in "${!sizes[@]}"; do
             mkdir -p android/app/src/main/res/mipmap-$density
@@ -87,20 +71,16 @@ jobs:
               android/app/src/main/res/mipmap-$density/ic_launcher.png
           done
 
-      # 🏗 Create project structure
       - name: Create Android Project
         run: |
           mkdir -p android/app/src/main/java/$PACKAGE_PATH
           mkdir -p android/app/src/main/assets
-
           cp -r build_app/* android/app/src/main/assets/
 
-      # 🧠 MainActivity
       - name: Create MainActivity
         run: |
           cat > android/app/src/main/java/$PACKAGE_PATH/MainActivity.java << EOF
           package $PACKAGE_NAME;
-
           import android.os.Bundle;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
@@ -109,77 +89,59 @@ jobs:
 
           public class MainActivity extends Activity {
               WebView webView;
-
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-
                   webView = new WebView(this);
                   setContentView(webView);
-
                   WebSettings s = webView.getSettings();
                   s.setJavaScriptEnabled(true);
                   s.setDomStorageEnabled(true);
-
                   webView.setWebViewClient(new WebViewClient());
                   webView.loadUrl("file:///android_asset/index.html");
-              }
-
-              @Override
-              public void onBackPressed() {
-                  if (webView.canGoBack()) webView.goBack();
-                  else super.onBackPressed();
               }
           }
           EOF
 
-      # ⚙️ Gradle + Android config
       - name: Android Config
         run: |
           mkdir -p android
 
-          # gradle.properties
           cat > android/gradle.properties << EOF
           android.useAndroidX=true
           android.enableJetifier=true
           EOF
 
-          # settings.gradle
           cat > android/settings.gradle << EOF
           rootProject.name = "$APP_NAME"
           include ':app'
           EOF
 
-          # root build.gradle
           cat > android/build.gradle << 'EOF'
           buildscript {
-            repositories {
-              google()
-              mavenCentral()
-            }
-            dependencies {
-              classpath 'com.android.tools.build:gradle:8.4.0'
-            }
+            repositories { google(); mavenCentral() }
+            dependencies { classpath 'com.android.tools.build:gradle:8.4.0' }
           }
-
           allprojects {
-            repositories {
-              google()
-              mavenCentral()
-            }
+            repositories { google(); mavenCentral() }
           }
           EOF
 
-          # app build.gradle (with Kotlin conflict fix)
           cat > android/app/build.gradle << EOF
           plugins {
             id 'com.android.application'
           }
-
           android {
             namespace "$PACKAGE_NAME"
             compileSdk 35
-
+            signingConfigs {
+              release {
+                storeFile file("\$rootDir/keystore.jks")
+                storePassword "password"
+                keyAlias "sanne"
+                keyPassword "password"
+              }
+            }
             defaultConfig {
               applicationId "$PACKAGE_NAME"
               minSdk 21
@@ -187,19 +149,16 @@ jobs:
               versionCode 1
               versionName "1.0"
             }
-
             buildTypes {
               release {
+                signingConfig signingConfigs.release
                 minifyEnabled false
               }
             }
           }
-
           dependencies {
             implementation 'androidx.appcompat:appcompat:1.7.0'
           }
-
-          // ✅ Force Kotlin stdlib versions to avoid duplicate classes
           configurations.all {
               resolutionStrategy {
                   force "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"
@@ -209,19 +168,21 @@ jobs:
           }
           EOF
 
-      # 📄 Manifest
       - name: Manifest
         run: |
           cat > android/app/src/main/AndroidManifest.xml << EOF
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="$PACKAGE_NAME">
 
+            <!-- Internet access is a normal permission granted at install time -->
             <uses-permission android:name="android.permission.INTERNET"/>
+            <!-- Optional: storage permissions (dangerous; require runtime request) -->
+            <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+            <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
 
             <application
                 android:label="$APP_NAME"
                 android:icon="@mipmap/ic_launcher">
-
               <activity android:name=".MainActivity"
                         android:exported="true">
                 <intent-filter>
@@ -229,38 +190,26 @@ jobs:
                   <category android:name="android.intent.category.LAUNCHER"/>
                 </intent-filter>
               </activity>
-
             </application>
           </manifest>
           EOF
 
-      # 🔨 Build APK
-      - name: Build APK
+      - name: Generate Keystore
+        run: |
+          keytool -genkeypair \
+            -alias sanne -keyalg RSA -keysize 2048 \
+            -validity 10000 -dname "CN=$APP_NAME" \
+            -storepass password -keypass password \
+            -keystore android/keystore.jks
+
+      - name: Build Release APK
         run: |
           cd android
           gradle wrapper --gradle-version 8.6
+          chmod +x ./gradlew
           ./gradlew assembleRelease
 
-      # 🔐 Sign APK
-      - name: Sign APK
-        run: |
-          keytool -genkey -v -keystore keystore.jks \
-          -alias sanne -storepass password -keypass password \
-          -keyalg RSA -validity 10000 \
-          -dname "CN=$APP_NAME"
-
-          APK=$(find android -name "*release*.apk" | head -n1)
-
-          $ANDROID_HOME/build-tools/*/apksigner sign \
-            --ks keystore.jks \
-            --ks-key-alias sanne \
-            --ks-pass pass:password \
-            --key-pass pass:password \
-            --out signed.apk \
-            "$APK"
-
-      # 📦 Upload
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: signed.apk
+          path: android/app/build/outputs/apk/release/*.apk
