@@ -45,7 +45,17 @@ jobs:
 
           cd $APP_DIR
           mkdir -p resources
-          curl -L -o resources/logo.png "$LOGO"
+          LOGO=$(grep '^logo=' $DETAILS_FILE | cut -d'=' -f2)
+          if [[ "$LOGO" == http* ]]; then
+          echo "Downloading logo from URL"
+          curl -L "$LOGO" -o logo.png
+          elif [ -f "$LOGO" ]; then
+          echo "Using local logo file"
+          cp "$LOGO" logo.png
+          else
+              echo "Using default logo"
+              curl -L "https://via.placeholder.com/512" -o logo.png
+          fi
 
           npx cap init "$APP_NAME" "$PACKAGE_NAME" || true
           npx cap add android || true
