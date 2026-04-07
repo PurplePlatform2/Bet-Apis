@@ -1,5 +1,5 @@
 import express from "express";
-import BetwayAPI from "./BetwayAPI.js";
+import BetwayAPI from "./BetwayApi.js";
 
 const app = express();
 
