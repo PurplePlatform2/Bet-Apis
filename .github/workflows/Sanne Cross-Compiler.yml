@@ -19,24 +19,22 @@ defaults:
 
 jobs:
 
-  # 🐧 ANDROID BUILD (SIGNED)
+# ================= ANDROID =================
   android:
-    name: Build Android APK (Signed)
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-java@v4
         with:
-          node-version: 20
+          distribution: temurin
+          java-version: 17
 
-      - name: Install dependencies
-        run: |
-          cd $APP_DIR
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - uses: android-actions/setup-android@v3
 
-      - name: Parse app details safely
+      # 🔍 Parse details.san
+      - name: Parse App Details
         run: |
           get_val() {
             grep "^$1=" $DETAILS_FILE | cut -d'=' -f2 | head -n1
@@ -54,125 +52,222 @@ jobs:
           echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
           echo "LOGO=$LOGO" >> $GITHUB_ENV
 
-      - name: Prepare logo
+          # convert package → folder path
+          PACKAGE_PATH=$(echo $PACKAGE_NAME | tr '.' '/')
+          echo "PACKAGE_PATH=$PACKAGE_PATH" >> $GITHUB_ENV
+
+      # 📦 Copy app files
+      - name: Copy App
         run: |
-          cd $APP_DIR
-          mkdir -p resources
+          mkdir build_app
+          rsync -av --exclude='details.san' $APP_DIR/ build_app/
+
+      # 🎨 Prepare logo
+      - name: Prepare Logo
+        run: |
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
 
           if [[ "$LOGO" == http* ]]; then
-            curl -L "$LOGO" -o resources/logo.png
-          elif [ -f "$LOGO" ]; then
-            cp "$LOGO" resources/logo.png
+            curl -L "$LOGO" -o icon.png
+          elif [ -f "$APP_DIR/$LOGO" ]; then
+            cp "$APP_DIR/$LOGO" icon.png
           else
-            curl -L "$DEFAULT_LOGO" -o resources/logo.png
+            curl -L "$DEFAULT_LOGO" -o icon.png
           fi
 
-      - name: Setup Capacitor
-        run: |
-          cd $APP_DIR
-          npx cap init "$APP_NAME" "$PACKAGE_NAME" --web-dir=.
-          npx cap add android || true
-          npx cap sync
+          cp icon.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
+      # 🏗 Create Android project
+      - name: Create Android Project
+        run: |
+          mkdir -p android/app/src/main/java/$PACKAGE_PATH
+          mkdir -p android/app/src/main/assets
+
+          cp -r build_app/* android/app/src/main/assets/
+
+      # 🧠 MainActivity
+      - name: Create MainActivity
+        run: |
+          cat > android/app/src/main/java/$PACKAGE_PATH/MainActivity.java << EOF
+          package $PACKAGE_NAME;
+
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.webkit.WebSettings;
+          import androidx.appcompat.app.AppCompatActivity;
+
+          public class MainActivity extends AppCompatActivity {
+              WebView webView;
+
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  webView = new WebView(this);
+                  setContentView(webView);
+
+                  WebSettings s = webView.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.loadUrl("file:///android_asset/index.html");
+              }
+
+              public void onBackPressed() {
+                  if (webView.canGoBack()) webView.goBack();
+                  else super.onBackPressed();
+              }
+          }
+          EOF
+
+      # ⚙️ Android config
+      - name: Android Config
+        run: |
+          cat > android/settings.gradle << EOF
+          rootProject.name = "$APP_NAME"
+          include ':app'
+          EOF
+
+          cat > android/build.gradle << 'EOF'
+          buildscript {
+            repositories { google(); mavenCentral() }
+            dependencies { classpath 'com.android.tools.build:gradle:8.2.0' }
+          }
+          allprojects { repositories { google(); mavenCentral() } }
+          EOF
+
+          cat > android/app/build.gradle << EOF
+          plugins { id 'com.android.application' }
+
+          android {
+            namespace "$PACKAGE_NAME"
+            compileSdk 34
+
+            defaultConfig {
+              applicationId "$PACKAGE_NAME"
+              minSdk 21
+              targetSdk 34
+              versionCode 1
+              versionName "1.0"
+            }
+
+            buildTypes { release { minifyEnabled false } }
+          }
+
+          dependencies {
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+          }
+          EOF
+
+      - name: Manifest
+        run: |
+          cat > android/app/src/main/AndroidManifest.xml << EOF
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="$PACKAGE_NAME">
+
+            <uses-permission android:name="android.permission.INTERNET"/>
+
+            <application
+                android:label="$APP_NAME"
+                android:icon="@mipmap/ic_launcher">
+
+              <activity android:name=".MainActivity">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
+              </activity>
+
+            </application>
+          </manifest>
+          EOF
+
+      # 🔨 Build
       - name: Build APK
         run: |
-          cd $APP_DIR/android
-          chmod +x gradlew
+          cd android
+          gradle wrapper
           ./gradlew assembleRelease
 
-      # 🔐 Decode keystore
-      - name: Decode Keystore
+      # 🔐 Sign
+      - name: Sign APK
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          keytool -genkey -v -keystore keystore.jks \
+          -alias sanne -storepass password -keypass password \
+          -keyalg RSA -validity 10000 \
+          -dname "CN=$APP_NAME"
 
-      # 🔐 Sign APK
-      - name: Sign APK (Sanne Karibo)
-        run: |
-          BUILD_APK=$(find $APP_DIR/android/app/build/outputs/apk/release -name "*.apk" | head -n1)
+          APK=$(find android -name "*release*.apk" | head -n1)
 
           $ANDROID_HOME/build-tools/*/apksigner sign \
             --ks keystore.jks \
-            --ks-key-alias ${{ secrets.KEY_ALIAS }} \
-            --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
-            --key-pass pass:${{ secrets.KEY_PASSWORD }} \
+            --ks-key-alias sanne \
+            --ks-pass pass:password \
+            --key-pass pass:password \
             --out signed.apk \
-            "$BUILD_APK"
+            "$APK"
 
-      - name: Upload Signed APK
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: sanne-karibo-signed-apk
+          name: android-apk
           path: signed.apk
 
 
-  # 🍎 iOS BUILD
+# ================= iOS =================
   ios:
-    name: Build iOS App
     runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
 
-      - name: Install dependencies
+      - name: Parse Details
         run: |
-          cd $APP_DIR
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          APP_NAME=$(grep '^appName=' $DETAILS_FILE | cut -d'=' -f2)
+          [ -z "$APP_NAME" ] && APP_NAME=$DEFAULT_APP_NAME
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
 
-      - name: Setup Capacitor iOS
+      - name: Copy App
         run: |
-          cd $APP_DIR
-          npx cap add ios || true
-          npx cap sync
+          mkdir ios_app
+          rsync -av --exclude='details.san' $APP_DIR/ ios_app/
+
+      - name: Create WKWebView App
+        run: |
+          mkdir -p ios/App
+
+          cat > ios/App/ViewController.swift << EOF
+          import UIKit
+          import WebKit
+
+          class ViewController: UIViewController {
+              var webView: WKWebView!
+
+              override func viewDidLoad() {
+                  super.viewDidLoad()
+
+                  webView = WKWebView(frame: self.view.frame)
+                  self.view.addSubview(webView)
+
+                  if let url = Bundle.main.url(forResource: "index", withExtension: "html") {
+                      webView.loadFileURL(url, allowingReadAccessTo: url)
+                  }
+              }
+          }
+          EOF
 
       - name: Build iOS
         run: |
-          cd $APP_DIR/ios/App
-          xcodebuild -scheme App -configuration Release build
+          xcodebuild -scheme App -configuration Release build || true
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ios-app
-          path: $APP_DIR/ios/build/**
+          name: ios-build
+          path: ios/
 
 
-  # 🪟 WINDOWS BUILD
-  windows:
-    name: Build Windows EXE
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        run: |
-          cd $env:APP_DIR
-          if (Test-Path package-lock.json) { npm ci } else { npm install }
-
-      - name: Setup Electron
-        run: |
-          cd $env:APP_DIR
-          npm install --save-dev electron electron-builder
-
-      - name: Build Windows
-        run: |
-          cd $env:APP_DIR
-          npx electron-builder --win
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-exe
-          path: $env:APP_DIR/dist/*.exe
-
-
-  # 🐧 LINUX BUILD
-  linux:
-    name: Build Linux App
+# ================= DESKTOP =================
+  desktop:
     runs-on: ubuntu-latest
 
     steps:
@@ -181,54 +276,38 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
+      - name: Copy App
         run: |
-          cd $APP_DIR
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          mkdir desktop
+          rsync -av --exclude='details.san' $APP_DIR/ desktop/
 
       - name: Setup Electron
         run: |
-          cd $APP_DIR
-          npm install --save-dev electron electron-builder
+          cd desktop
+          npm init -y
+          npm install electron electron-builder
 
-      - name: Build Linux
+          cat > main.js << EOF
+          const { app, BrowserWindow } = require('electron');
+
+          function createWindow() {
+            const win = new BrowserWindow({
+              width: 900,
+              height: 700,
+              title: "$APP_NAME"
+            });
+            win.loadFile('index.html');
+          }
+
+          app.whenReady().then(createWindow);
+          EOF
+
+      - name: Build Desktop
         run: |
-          cd $APP_DIR
-          npx electron-builder --linux
+          cd desktop
+          npx electron-builder --linux --win --mac
 
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-app
-          path: $APP_DIR/dist/*.AppImage
-
-
-  # 🍎 MAC DESKTOP BUILD
-  mac:
-    name: Build macOS App
-    runs-on: macos-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        run: |
-          cd $APP_DIR
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
-      - name: Setup Electron
-        run: |
-          cd $APP_DIR
-          npm install --save-dev electron electron-builder
-
-      - name: Build macOS
-        run: |
-          cd $APP_DIR
-          npx electron-builder --mac
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mac-app
-          path: $APP_DIR/dist/*.dmg
+          name: desktop-builds
+          path: desktop/dist/
