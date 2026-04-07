@@ -60,20 +60,32 @@ jobs:
           mkdir build_app
           rsync -av --exclude='details.san' $APP_DIR/ build_app/
 
-      # 🎨 Prepare logo (FIXED curl issue)
+      # 🎨 Prepare logo (FFmpeg conversion + densities)
       - name: Prepare Logo
         run: |
-          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          sudo apt-get update && sudo apt-get install -y ffmpeg imagemagick
 
+          mkdir -p android/app/src/main/res
+
+          # Download or copy logo
           if [[ "$LOGO" =~ ^https?:// ]]; then
-            curl -L "$LOGO" -o icon.png
+            curl -L "$LOGO" -o icon.tmp
           elif [ -f "$APP_DIR/$LOGO" ]; then
-            cp "$APP_DIR/$LOGO" icon.png
+            cp "$APP_DIR/$LOGO" icon.tmp
           else
-            curl -L "$DEFAULT_LOGO" -o icon.png
+            curl -L "$DEFAULT_LOGO" -o icon.tmp
           fi
 
-          cp icon.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          # Convert to PNG if not already valid PNG
+          ffmpeg -y -i icon.tmp icon.png || convert icon.tmp -background none -flatten icon.png
+
+          # Generate all densities
+          declare -A sizes=( ["mdpi"]=48 ["hdpi"]=72 ["xhdpi"]=96 ["xxhdpi"]=144 ["xxxhdpi"]=192 )
+          for density in "${!sizes[@]}"; do
+            mkdir -p android/app/src/main/res/mipmap-$density
+            convert icon.png -resize ${sizes[$density]}x${sizes[$density]} \
+              android/app/src/main/res/mipmap-$density/ic_launcher.png
+          done
 
       # 🏗 Create project structure
       - name: Create Android Project
@@ -121,12 +133,12 @@ jobs:
           }
           EOF
 
-      # ⚙️ Gradle + Android config (UPDATED)
+      # ⚙️ Gradle + Android config
       - name: Android Config
         run: |
           mkdir -p android
 
-          # gradle.properties (FIX AndroidX error)
+          # gradle.properties
           cat > android/gradle.properties << EOF
           android.useAndroidX=true
           android.enableJetifier=true
