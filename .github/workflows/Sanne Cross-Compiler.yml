@@ -9,20 +9,19 @@ env:
   APP_DIR: app
   DETAILS_FILE: app/details.san
   DEFAULT_APP_NAME: "SanneWebApp"
-  DEFAULT_PACKAGE_NAME: "com.sanne.webApp"
+  DEFAULT_PACKAGE_NAME: "com.sanne.webapp"
   DEFAULT_LOGO: "https://picsum.photos/512"
   DEFAULT_VERSION: "1.0.0"
 
-# 🔧 Shared step: install dependencies safely
 defaults:
   run:
     shell: bash
 
 jobs:
 
-  # 🐧 ANDROID BUILD
+  # 🐧 ANDROID BUILD (SIGNED)
   android:
-    name: Build Android APK
+    name: Build Android APK (Signed)
     runs-on: ubuntu-latest
 
     steps:
@@ -37,27 +36,41 @@ jobs:
           cd $APP_DIR
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-      - name: Parse app details
+      - name: Parse app details safely
         run: |
-          APP_NAME=$(grep '^appName=' $DETAILS_FILE | cut -d'=' -f2 || echo "$DEFAULT_APP_NAME")
-          PACKAGE_NAME=$(grep '^packageName=' $DETAILS_FILE | cut -d'=' -f2 || echo "$DEFAULT_PACKAGE_NAME")
-          LOGO=$(grep '^logo=' $DETAILS_FILE | cut -d'=' -f2 || echo "$DEFAULT_LOGO")
+          get_val() {
+            grep "^$1=" $DETAILS_FILE | cut -d'=' -f2 | head -n1
+          }
 
+          APP_NAME=$(get_val appName)
+          PACKAGE_NAME=$(get_val packageName)
+          LOGO=$(get_val logo)
+
+          [ -z "$APP_NAME" ] && APP_NAME=$DEFAULT_APP_NAME
+          [ -z "$PACKAGE_NAME" ] && PACKAGE_NAME=$DEFAULT_PACKAGE_NAME
+          [ -z "$LOGO" ] && LOGO=$DEFAULT_LOGO
+
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+          echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
+          echo "LOGO=$LOGO" >> $GITHUB_ENV
+
+      - name: Prepare logo
+        run: |
           cd $APP_DIR
           mkdir -p resources
-          LOGO=$(grep '^logo=' $DETAILS_FILE | cut -d'=' -f2)
+
           if [[ "$LOGO" == http* ]]; then
-          echo "Downloading logo from URL"
-          curl -L "$LOGO" -o logo.png
+            curl -L "$LOGO" -o resources/logo.png
           elif [ -f "$LOGO" ]; then
-          echo "Using local logo file"
-          cp "$LOGO" logo.png
+            cp "$LOGO" resources/logo.png
           else
-              echo "Using default logo"
-              curl -L "https://via.placeholder.com/512" -o logo.png
+            curl -L "$DEFAULT_LOGO" -o resources/logo.png
           fi
 
-          npx cap init "$APP_NAME" "$PACKAGE_NAME" || true
+      - name: Setup Capacitor
+        run: |
+          cd $APP_DIR
+          npx cap init "$APP_NAME" "$PACKAGE_NAME" --web-dir=.
           npx cap add android || true
           npx cap sync
 
@@ -65,13 +78,31 @@ jobs:
         run: |
           cd $APP_DIR/android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
-      - name: Upload APK
+      # 🔐 Decode keystore
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+
+      # 🔐 Sign APK
+      - name: Sign APK (Sanne Karibo)
+        run: |
+          BUILD_APK=$(find $APP_DIR/android/app/build/outputs/apk/release -name "*.apk" | head -n1)
+
+          $ANDROID_HOME/build-tools/*/apksigner sign \
+            --ks keystore.jks \
+            --ks-key-alias ${{ secrets.KEY_ALIAS }} \
+            --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
+            --key-pass pass:${{ secrets.KEY_PASSWORD }} \
+            --out signed.apk \
+            "$BUILD_APK"
+
+      - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: $APP_DIR/android/app/build/outputs/apk/debug/app-debug.apk
+          name: sanne-karibo-signed-apk
+          path: signed.apk
 
 
   # 🍎 iOS BUILD
@@ -81,7 +112,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -102,8 +132,7 @@ jobs:
           cd $APP_DIR/ios/App
           xcodebuild -scheme App -configuration Release build
 
-      - name: Upload iOS App
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: ios-app
           path: $APP_DIR/ios/build/**
@@ -116,7 +145,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -131,30 +159,12 @@ jobs:
           cd $env:APP_DIR
           npm install --save-dev electron electron-builder
 
-          if (!(Test-Path main.js)) {
-            @"
-            const { app, BrowserWindow } = require('electron');
-            const path = require('path');
-            function createWindow() {
-              const win = new BrowserWindow({
-                width: 800,
-                height: 600,
-                icon: path.join(__dirname, 'resources/logo.png'),
-                webPreferences: { nodeIntegration: true }
-              });
-              win.loadFile('index.html');
-            }
-            app.whenReady().then(createWindow);
-            "@ | Out-File main.js
-          }
-
-      - name: Build Windows App
+      - name: Build Windows
         run: |
           cd $env:APP_DIR
           npx electron-builder --win
 
-      - name: Upload Windows EXE
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: windows-exe
           path: $env:APP_DIR/dist/*.exe
@@ -167,7 +177,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -182,13 +191,12 @@ jobs:
           cd $APP_DIR
           npm install --save-dev electron electron-builder
 
-      - name: Build Linux App
+      - name: Build Linux
         run: |
           cd $APP_DIR
           npx electron-builder --linux
 
-      - name: Upload Linux App
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: linux-app
           path: $APP_DIR/dist/*.AppImage
@@ -201,7 +209,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -216,13 +223,12 @@ jobs:
           cd $APP_DIR
           npm install --save-dev electron electron-builder
 
-      - name: Build macOS App
+      - name: Build macOS
         run: |
           cd $APP_DIR
           npx electron-builder --mac
 
-      - name: Upload macOS App
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: mac-app
           path: $APP_DIR/dist/*.dmg
