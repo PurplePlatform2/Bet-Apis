@@ -1,8 +1,8 @@
 import express from "express";
 import BetwayAPI from "./BetwayApi.js";
-
+import cors from "cors";
 const app = express();
-
+app.use(cors());
 // ✅ Use Render dynamic port
 const PORT = process.env.PORT || 3000;
 
