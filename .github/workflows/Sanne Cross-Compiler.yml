@@ -1,106 +1,128 @@
-name: Sanne Cross-compiler
+name: Sanne Cross-Platform Builder
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-jobs:
-  build:
-    name: Build Capacitor & Desktop Apps
-    runs-on: macos-latest
+env:
+  APP_DIR: app
+  DETAILS_FILE: app/details.san
+  DEFAULT_APP_NAME: "SanneWebApp"
+  DEFAULT_PACKAGE_NAME: "com.sanne.webApp"
+  DEFAULT_LOGO: "https://picsum.photos/512"
+  DEFAULT_VERSION: "1.0.0"
 
-    env:
-      APP_DIR: app
-      DETAILS_FILE: app/details.san
-      DEFAULT_APP_NAME: "SanneWebApp"
-      DEFAULT_PACKAGE_NAME: "com.sanne.webApp"
-      DEFAULT_LOGO: "https://picsum.photos/512"  # random free image
-      DEFAULT_VERSION: "1.0.0"
+# 🔧 Shared step: install dependencies safely
+defaults:
+  run:
+    shell: bash
+
+jobs:
+
+  # 🐧 ANDROID BUILD
+  android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout the repository
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # 2️⃣ Set up Node.js
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
 
-      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: |
           cd $APP_DIR
-          npm ci
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-      # 4️⃣ Read app details from details.san (with defaults)
       - name: Parse app details
-        id: appdetails
         run: |
           APP_NAME=$(grep '^appName=' $DETAILS_FILE | cut -d'=' -f2 || echo "$DEFAULT_APP_NAME")
           PACKAGE_NAME=$(grep '^packageName=' $DETAILS_FILE | cut -d'=' -f2 || echo "$DEFAULT_PACKAGE_NAME")
           LOGO=$(grep '^logo=' $DETAILS_FILE | cut -d'=' -f2 || echo "$DEFAULT_LOGO")
-          VERSION=$(grep '^version=' $DETAILS_FILE | cut -d'=' -f2 || echo "$DEFAULT_VERSION")
-          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
-          echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
-          echo "LOGO=$LOGO" >> $GITHUB_ENV
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "App details loaded: $APP_NAME, $PACKAGE_NAME, $LOGO, $VERSION"
 
-      # 5️⃣ Initialize Capacitor (if not initialized)
-      - name: Initialize Capacitor
-        run: |
-          cd $APP_DIR
-          npx cap init "$APP_NAME" "$PACKAGE_NAME" || echo "Already initialized"
-
-      # 6️⃣ Copy logo to resources
-      - name: Set App Logo
-        run: |
           cd $APP_DIR
           mkdir -p resources
-          curl -o resources/logo.png "$LOGO"
-          echo "Logo copied to resources/logo.png"
+          curl -L -o resources/logo.png "$LOGO"
 
-      # 7️⃣ Add mobile platforms
-      - name: Add Android & iOS Platforms
-        run: |
-          cd $APP_DIR
-          npx cap add android || echo "Android already added"
-          npx cap add ios || echo "iOS already added"
-
-      # 8️⃣ Sync Capacitor
-      - name: Sync Capacitor
-        run: |
-          cd $APP_DIR
+          npx cap init "$APP_NAME" "$PACKAGE_NAME" || true
+          npx cap add android || true
           npx cap sync
 
-      # 9️⃣ Build Android APK
-      - name: Build Android
+      - name: Build APK
         run: |
           cd $APP_DIR/android
+          chmod +x gradlew
           ./gradlew assembleDebug
 
-      # 🔟 Build iOS
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: $APP_DIR/android/app/build/outputs/apk/debug/app-debug.apk
+
+
+  # 🍎 iOS BUILD
+  ios:
+    name: Build iOS App
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          cd $APP_DIR
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Setup Capacitor iOS
+        run: |
+          cd $APP_DIR
+          npx cap add ios || true
+          npx cap sync
+
       - name: Build iOS
         run: |
           cd $APP_DIR/ios/App
           xcodebuild -scheme App -configuration Release build
 
-      # 1️⃣1️⃣ Set up Electron for Desktop builds
-      - name: Install Electron Builder
+      - name: Upload iOS App
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app
+          path: $APP_DIR/ios/build/**
+
+
+  # 🪟 WINDOWS BUILD
+  windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
         run: |
-          cd $APP_DIR
+          cd $env:APP_DIR
+          if (Test-Path package-lock.json) { npm ci } else { npm install }
+
+      - name: Setup Electron
+        run: |
+          cd $env:APP_DIR
           npm install --save-dev electron electron-builder
 
-      # 1️⃣2️⃣ Build Desktop apps
-      - name: Build Desktop Apps
-        run: |
-          cd $APP_DIR
-          # create minimal Electron entry if not exists
-          if [ ! -f main.js ]; then
-            cat <<'EOF' > main.js
+          if (!(Test-Path main.js)) {
+            @"
             const { app, BrowserWindow } = require('electron');
             const path = require('path');
             function createWindow() {
@@ -113,19 +135,84 @@ jobs:
               win.loadFile('index.html');
             }
             app.whenReady().then(createWindow);
-            EOF
-          fi
+            "@ | Out-File main.js
+          }
 
-          npx electron-builder --mac --win --linux
+      - name: Build Windows App
+        run: |
+          cd $env:APP_DIR
+          npx electron-builder --win
 
-      # 1️⃣3️⃣ Upload all artifacts
-      - name: Upload Artifacts
+      - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
         with:
-          name: app-artifacts
-          path: |
-            $APP_DIR/android/app/build/outputs/apk/debug/app-debug.apk
-            $APP_DIR/ios/build/Release-iphoneos/*.app
-            $APP_DIR/dist/*.exe
-            $APP_DIR/dist/*.dmg
-            $APP_DIR/dist/*.AppImage
+          name: windows-exe
+          path: $env:APP_DIR/dist/*.exe
+
+
+  # 🐧 LINUX BUILD
+  linux:
+    name: Build Linux App
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          cd $APP_DIR
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Setup Electron
+        run: |
+          cd $APP_DIR
+          npm install --save-dev electron electron-builder
+
+      - name: Build Linux App
+        run: |
+          cd $APP_DIR
+          npx electron-builder --linux
+
+      - name: Upload Linux App
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-app
+          path: $APP_DIR/dist/*.AppImage
+
+
+  # 🍎 MAC DESKTOP BUILD
+  mac:
+    name: Build macOS App
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          cd $APP_DIR
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Setup Electron
+        run: |
+          cd $APP_DIR
+          npm install --save-dev electron electron-builder
+
+      - name: Build macOS App
+        run: |
+          cd $APP_DIR
+          npx electron-builder --mac
+
+      - name: Upload macOS App
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-app
+          path: $APP_DIR/dist/*.dmg
