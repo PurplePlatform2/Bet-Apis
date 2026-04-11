@@ -104,4 +104,4 @@ class BetwayAPI {
   }
 }
 
-module.exports = BetwayAPI;
+export default BetwayAPI;
