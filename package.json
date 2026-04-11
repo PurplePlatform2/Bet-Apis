@@ -1,13 +1,17 @@
 {
-  "name": "betAi",
+  "name": "betAI",
   "version": "1.0.0",
-  "description": "Betway API wrapper server",
-  "main": "app.js",
   "type": "module",
+  "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
   }
 }
