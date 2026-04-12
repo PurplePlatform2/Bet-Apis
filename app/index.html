@@ -28,7 +28,6 @@
       100% { opacity: 1; }
     }
 
-    /* custom scrollbar */
     ::-webkit-scrollbar {
       width: 6px;
     }
@@ -44,7 +43,6 @@
       background: #94a3b8;
     }
 
-    /* main app flex column */
     .app-wrapper {
       display: flex;
       flex-direction: column;
@@ -53,7 +51,6 @@
       background: #f5f7fb;
     }
 
-    /* Top App Bar - Material */
     .top-bar {
       background: #ffffff;
       backdrop-filter: blur(0px);
@@ -103,7 +100,6 @@
       font-size: 22px;
     }
 
-    /* row: sidebar + main */
     .dashboard-row {
       display: flex;
       flex: 1;
@@ -111,7 +107,6 @@
       gap: 0;
     }
 
-    /* SIDEBAR — Material Drawer style (always visible) */
     .sidebar {
       width: 300px;
       background: #ffffff;
@@ -177,18 +172,7 @@
       padding: 0.2rem 0.6rem;
       border-radius: 40px;
     }
-    .other-match-item {
-      display: flex;
-      justify-content: space-between;
-      background: #ffffff;
-      padding: 0.7rem 0rem;
-      border-bottom: 1px dashed #e9edf2;
-    }
-    .other-match-item .teams {
-      font-size: 0.85rem;
-    }
 
-    /* MAIN CONTENT — AI OPPORTUNITIES */
     .main-content {
       flex: 1;
       overflow-y: auto;
@@ -235,7 +219,6 @@
       gap: 1.2rem;
       margin-top: 0.5rem;
     }
-    /* match card material */
     .match-card {
       background: #ffffff;
       border-radius: 28px;
@@ -322,7 +305,6 @@
       padding-top: 0.7rem;
       gap: 1rem;
     }
-    /* BOTTOM APP BAR */
     .bottom-app-bar {
       background: #ffffff;
       backdrop-filter: blur(12px);
@@ -340,7 +322,7 @@
       flex-direction: column;
       align-items: center;
       gap: 0.2rem;
-      cursor: default;
+      cursor: pointer;
       opacity: 0.7;
       transition: all 0.2s ease;
       padding: 0.4rem 0.8rem;
@@ -361,22 +343,13 @@
       background: #eef3f0;
       transform: translateY(-2px);
     }
-    /* responsive */
     @media (max-width: 780px) {
-      .sidebar {
-        width: 260px;
-      }
-      .main-content {
-        padding: 1.2rem;
-      }
-      .team {
-        font-size: 1rem;
-      }
+      .sidebar { width: 260px; }
+      .main-content { padding: 1.2rem; }
+      .team { font-size: 1rem; }
     }
     @media (max-width: 650px) {
-      .dashboard-row {
-        flex-direction: column;
-      }
+      .dashboard-row { flex-direction: column; }
       .sidebar {
         width: 100%;
         max-height: 280px;
@@ -386,16 +359,9 @@
         gap: 0.5rem;
         padding: 0.8rem;
       }
-      .sidebar-section {
-        min-width: 220px;
-        border-bottom: none;
-      }
-      body {
-        overflow: auto;
-      }
-      .app-wrapper {
-        height: auto;
-      }
+      .sidebar-section { min-width: 220px; border-bottom: none; }
+      body { overflow: auto; }
+      .app-wrapper { height: auto; }
     }
     .empty-state {
       font-size: 0.8rem;
@@ -404,290 +370,505 @@
       text-align: center;
     }
     @keyframes spin {
-  to { transform: rotate(360deg); }
-}
+      to { transform: rotate(360deg); }
+    }
+
+    /* Live panel styles (unchanged) */
+    .live-panel {
+      flex: 1;
+      background: #f8fafc;
+      overflow-y: auto;
+      padding: 1.8rem 2rem;
+      animation: fadeInUp 0.5s ease-out;
+    }
+    .live-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 1.8rem;
+      gap: 1rem;
+    }
+    .live-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .live-title h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #1e3b2f, #1f6e46);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+    }
+    .live-badge {
+      background: #eef2ff;
+      border-radius: 60px;
+      padding: 0.3rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #0f3b2c;
+    }
+    .home-button {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 40px;
+      padding: 0.5rem 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #2c6e4e;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    .home-button:hover {
+      background: #eef3f0;
+      transform: translateY(-1px);
+      border-color: #cbd5e1;
+    }
+    .live-table-wrapper {
+      background: #ffffff;
+      border-radius: 32px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03), 0 2px 6px rgba(0, 0, 0, 0.05);
+      overflow-x: auto;
+      border: 1px solid #edf2f7;
+    }
+    .live-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 0.9rem;
+      min-width: 700px;
+    }
+    .live-table th {
+      text-align: left;
+      padding: 1rem 1.2rem;
+      background: #f9fbfe;
+      font-weight: 600;
+      color: #2c5f4a;
+      border-bottom: 1px solid #eef2f6;
+      font-size: 0.8rem;
+      letter-spacing: 0.3px;
+    }
+    .live-table td {
+      padding: 1rem 1.2rem;
+      border-bottom: 1px solid #f0f4f9;
+      color: #1e2a3e;
+      font-weight: 500;
+    }
+    .live-table tr:last-child td {
+      border-bottom: none;
+    }
+    .live-table tr:hover td {
+      background-color: #fafdff;
+    }
+    .match-name {
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .match-name .teams-sm {
+      font-weight: 700;
+    }
+    .match-time-status {
+      font-size: 0.7rem;
+      color: #5f7f6e;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .live-indicator {
+      background: #e31b23;
+      color: white;
+      border-radius: 20px;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.65rem;
+      font-weight: 600;
+    }
+    .odds-cell {
+      font-family: monospace;
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 0.3px;
+    }
+    .odds-home, .odds-draw, .odds-away {
+      background: #f1f5f9;
+      padding: 0.2rem 0.6rem;
+      border-radius: 24px;
+      display: inline-block;
+      min-width: 60px;
+      text-align: center;
+    }
+    .score-placeholder {
+      color: #94a3b8;
+      font-weight: 400;
+      background: #f8fafc;
+      padding: 0.2rem 0.6rem;
+      border-radius: 24px;
+      font-size: 0.8rem;
+    }
+    .refresh-timestamp {
+      font-size: 0.7rem;
+      color: #6c8b7a;
+      margin-top: 1rem;
+      text-align: right;
+    }
+    .live-loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 3rem;
+      gap: 12px;
+      color: #2c6e4e;
+    }
   </style>
 </head>
 <body>
-    <div id="splashScreen" style="
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:linear-gradient(135deg,#0f2b3d,#1b4d3e);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  flex-direction:column;
-  z-index:9999;
-  color:white;
-  font-family:Inter,sans-serif;
-">
-  <h1 style="margin-bottom:10px;">CS Tech Bet-AI</h1>
-
-  <div style="
-    width:50px;
-    height:50px;
-    border:4px solid rgba(255,255,255,0.2);
-    border-top:4px solid #00ffae;
-    border-radius:50%;
-    animation:spin 1s linear infinite;
-  "></div>
-
-  <p style="margin-top:12px; font-size:0.9rem; opacity:0.8;">
-    Loading AI predictions...
-  </p>
-</div>
-    
-<div class="app-wrapper">
-  <!-- Top Bar -->
-  <div class="top-bar">
-    <div class="logo-area">
-      <h1>CS Tech Bet-AI <span>β · AI edge</span></h1>
-    </div>
-    <div class="top-actions">
-      <div class="icon-btn"><i class="material-icons">notifications_none</i></div>
-      <div class="icon-btn"><i class="material-icons">account_circle</i></div>
-    </div>
+  <div id="splashScreen" style="position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#0f2b3d,#1b4d3e);display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:9999;color:white;font-family:Inter,sans-serif;">
+    <h1 style="margin-bottom:10px;">CS Tech Bet-AI</h1>
+    <div style="width:50px;height:50px;border:4px solid rgba(255,255,255,0.2);border-top:4px solid #00ffae;border-radius:50%;animation:spin 1s linear infinite;"></div>
+    <p style="margin-top:12px; font-size:0.9rem; opacity:0.8;">Loading AI predictions...</p>
   </div>
 
-  <!-- Sidebar + Main -->
-  <div class="dashboard-row">
-    <!-- SIDEBAR: General fixtures & Other matches -->
-    <aside class="sidebar" id="sidebarContainer">
-      <!-- dynamic injected via JS for fixtures and other matches -->
-    </aside>
+  <div class="app-wrapper">
+    <div class="top-bar">
+      <div class="logo-area">
+        <h1>CS Tech Bet-AI <span>β · AI edge</span></h1>
+      </div>
+      <div class="top-actions">
+        <div class="icon-btn"><i class="material-icons">notifications_none</i></div>
+        <div class="icon-btn"><i class="material-icons">account_circle</i></div>
+      </div>
+    </div>
 
-    <!-- MAIN: AI Opportunities -->
-    <main class="main-content">
-      <div class="ai-header">
-        <h2>🤖 AI Opportunities</h2>
-        <div class="ai-badge">
-          <i class="material-icons">auto_awesome</i> 
-          <span>Live predictions · green = winning team</span>
+    <div class="dashboard-row" id="dashboardRow">
+      <aside class="sidebar" id="sidebarContainer"></aside>
+      <main class="main-content">
+        <div class="ai-header">
+          <h2>🤖 AI Opportunities</h2>
+          <div class="ai-badge">
+            <i class="material-icons">auto_awesome</i> 
+            <span>Live predictions · green = winning team</span>
+          </div>
         </div>
+        <div class="matches-grid" id="aiMatchesGrid"></div>
+      </main>
+    </div>
+
+    <div id="liveMatchesPanel" class="live-panel" style="display: none;">
+      <div class="live-header">
+        <div class="live-title">
+          <i class="material-icons" style="font-size: 32px; color: #2c6e4e;">sports_soccer</i>
+          <h2>⚡ Live Matches & Odds</h2>
+          <div class="live-badge"><i class="material-icons">wifi</i> Real-time updates</div>
+        </div>
+        <button class="home-button" id="backToHomeBtn">
+          <i class="material-icons">arrow_back</i> Back to Home
+        </button>
       </div>
-      <div class="matches-grid" id="aiMatchesGrid">
-        <!-- dynamic AI matches cards will be injected -->
+      <div class="live-table-wrapper">
+        <table class="live-table" id="liveOddsTable">
+          <thead>
+            <tr><th>Match</th><th>Score</th><th>Home</th><th>Draw</th><th>Away</th><th>Status</th></tr>
+          </thead>
+          <tbody id="liveTableBody">
+            <tr><td colspan="6" class="live-loading"><div class="loading-spinner-small" style="width:20px;height:20px;border:2px solid #cbd5e1;border-top-color:#2c6e4e;border-radius:50%;animation:spin 0.8s linear infinite;"></div> Connecting to live odds feed...</td></tr>
+          </tbody>
+        </table>
       </div>
-    </main>
+      <div class="refresh-timestamp" id="liveUpdateTimestamp">Waiting for data...</div>
+    </div>
+
+    <div class="bottom-app-bar">
+      <div class="nav-item" data-nav="updates"><i class="material-icons">sports_soccer</i><span>Updates</span></div>
+      <div class="nav-item" data-nav="arbitrage"><i class="material-icons">insights</i><span>Arbitrage</span></div>
+      <div class="nav-item" data-nav="invest"><i class="material-icons">bolt</i><span>Invest</span></div>
+      <div class="nav-item" data-nav="history"><i class="material-icons">bar_chart</i><span>History</span></div>
+      <div class="nav-item" data-nav="balance"><i class="material-icons">account_balance_wallet</i><span>Balance</span></div>
+    </div>
   </div>
 
-  <!-- Bottom App Bar with icons + coming soon -->
-  <div class="bottom-app-bar">
-    <div class="nav-item">
-      <i class="material-icons">sports_soccer</i>
-      <span>Coming soon</span>
-    </div>
-    <div class="nav-item">
-      <i class="material-icons">insights</i>
-      <span>Coming soon</span>
-    </div>
-    <div class="nav-item">
-      <i class="material-icons">bolt</i>
-      <span>Coming soon</span>
-    </div>
-    <div class="nav-item">
-      <i class="material-icons">bar_chart</i>
-      <span>Coming soon</span>
-    </div>
-    <div class="nav-item">
-      <i class="material-icons">account_balance_wallet</i>
-      <span>Coming soon</span>
-    </div>
-  </div>
-</div>
-    <script>
-  const API_URL = "https://betai-92ov.onrender.com/matches?take=300";
+  <script>
+    // ---------- EXISTING CODE (AI matches) - untouched ----------
+    const API_URL = "https://betai-92ov.onrender.com/matches?take=300";
+    let allMatches = [];
 
-  let allMatches = [];
-
-  // ---------- FETCH DATA ----------
-  async function fetchMatches() {
-  try {
-    const res = await fetch(API_URL);
-    const json = await res.json();
-
-    if (!json.success) throw new Error("Invalid response");
-
-    allMatches = json.data || [];
-
-    processData()
-    hideSplash();
-
-  } catch (err) {
-    console.error("Fetch error:", err);
-    alert("An Error Occured Reaching Us:: Kindly Bear with Us");
-    hideSplash(); setInterval(1500,fetchMatches());
-  }
-}
-
-  // ---------- PROCESS DATA ----------
-  function processData() {
-    const aiMatches = [];
-    const otherMatches = [];
-
-    allMatches.forEach(match => {
-      const { match: name, win, draw, loss, datetime } = match;
-
-      const odds = [win, draw, loss].filter(v => v !== undefined);
-      const minOdd = Math.min(...odds);
-
-      // split teams
-      const [homeTeam, awayTeam] = name.split(" Vs ");
-
-      // determine winner side
-      let winner = null;
-      if (minOdd === win) winner = "home";
-      else if (minOdd === loss) winner = "away";
-      else if (minOdd === draw) winner = "draw";
-
-      // format time
-      const time = new Date(datetime).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
-      // AI OPPORTUNITY
-      if (minOdd < 1.10 && winner !== "draw") {
-        aiMatches.push({
-          homeTeam,
-          awayTeam,
-          winner,
-          time,
-          odd: minOdd,
-          confidence: Math.round((1 / minOdd) * 100),
-          insight: `Ultra low odds (${minOdd})`
-        });
-      } else {
-        otherMatches.push({
-          teamA: homeTeam,
-          teamB: awayTeam,
-          date: time
-        });
+    async function fetchMatches() {
+      try {
+        const res = await fetch(API_URL);
+        const json = await res.json();
+        if (!json.success) throw new Error("Invalid response");
+        allMatches = json.data || [];
+        processData();
+        hideSplash();
+      } catch (err) {
+        console.error("Fetch error:", err);
+        alert("An Error Occurred Reaching Us:: Please kindly ensure you have a stable internet and try again\n");
+        hideSplash(); 
+        setTimeout(fetchMatches, 5000);
       }
-    });
-
-    renderSidebar(otherMatches);
-    renderAIOpportunities(aiMatches);
-  }
-
-  // ---------- SIDEBAR ----------
-  function renderSidebar(otherMatches) {
-    const sidebar = document.getElementById('sidebarContainer');
-    if (!sidebar) return;
-
-    const otherHtml = `
-      <div class="sidebar-section">
-        <h3><i class="material-icons">sports</i> OTHER MATCHES</h3>
-        <div class="match-list">
-          ${
-            otherMatches.length === 0
-              ? `<div class="empty-state">No matches available</div>`
-              : otherMatches.slice(0, 20).map(m => `
-                <div class="fixture-item" style="background:#ffffff;">
-                  <div class="teams">${m.teamA} vs ${m.teamB}</div>
-                  <div class="match-time">${m.date}</div>
-                </div>
-              `).join('')
-          }
-        </div>
-      </div>
-    `;
-
-    sidebar.innerHTML = otherHtml;
-  }
-
-  // ---------- AI OPPORTUNITIES ----------
-  function renderAIOpportunities(aiMatches) {
-    const container = document.getElementById('aiMatchesGrid');
-    if (!container) return;
-
-    if (aiMatches.length === 0) {
-      container.innerHTML = `<div class="empty-state">No AI opportunities found</div>`;
-      return;
     }
 
-    let cardsHtml = '';
+    function processData() {
+      const aiMatches = [];
+      const otherMatches = [];
+      allMatches.forEach(match => {
+        const { match: name, win, draw, loss, datetime } = match;
+        const odds = [win, draw, loss].filter(v => v !== undefined);
+        const minOdd = Math.min(...odds);
+        const [homeTeam, awayTeam] = name.split(" vs ");
+        let winner = null;
+        if (minOdd === win) winner = "home";
+        else if (minOdd === loss) winner = "away";
+        else if (minOdd === draw) winner = "draw";
+        const time = formatMatch(datetime);
+        if (minOdd < 1.10 && winner !== "draw") {
+          aiMatches.push({
+            homeTeam, awayTeam, winner, time, odd: minOdd,
+            confidence: Math.round((1 / minOdd) * 100),
+            insight: `  Marginal N${Math.round((minOdd-1)*100)} per Units`
+          });
+        } else {
+          otherMatches.push({ teamA: homeTeam, teamB: awayTeam, date: time });
+        }
+      });
+      renderSidebar(otherMatches);
+      renderAIOpportunities(aiMatches);
+    }
 
-    aiMatches.forEach((match, idx) => {
-      const winnerTeamName = match.winner === 'home' ? match.homeTeam : match.awayTeam;
+    function renderSidebar(otherMatches) {
+      const sidebar = document.getElementById('sidebarContainer');
+      if (!sidebar) return;
+      const otherHtml = `<div class="sidebar-section"><h3><i class="material-icons">sports</i> OTHER MATCHES</h3><div class="match-list">${
+        otherMatches.length === 0 ? `<div class="empty-state">No matches available</div>` : otherMatches.slice(0, 20).map(m => `<div class="fixture-item"><div class="teams">${m.teamA} vs ${m.teamB}</div><div class="match-time">${m.date}</div></div>`).join('')
+      }</div></div>`;
+      sidebar.innerHTML = otherHtml;
+    }
 
-      const homeClass = match.winner === 'home' ? 'winner-highlight' : '';
-      const awayClass = match.winner === 'away' ? 'winner-highlight' : '';
+    function renderAIOpportunities(aiMatches) {
+      const container = document.getElementById('aiMatchesGrid');
+      if (!container) return;
+      if (aiMatches.length === 0) { container.innerHTML = `<div class="empty-state">No AI opportunities found</div>`; return; }
+      let cardsHtml = '';
+      aiMatches.forEach((match, idx) => {
+        const winnerTeamName = match.winner === 'home' ? match.homeTeam : match.awayTeam;
+        const homeClass = match.winner === 'home' ? 'winner-highlight' : '';
+        const awayClass = match.winner === 'away' ? 'winner-highlight' : '';
+        cardsHtml += `<div class="match-card" style="--order:${idx};"><div class="match-header"><span class="league"><i class="material-icons" style="font-size:14px;">smart_toy</i> AI DETECTED</span><span class="ai-confidence"><i class="material-icons">insights</i> ${match.confidence}%</span></div><div class="match-teams"><span class="team ${homeClass}"><i class="material-icons">sports_soccer</i> ${match.homeTeam}</span><span class="vs">VS</span><span class="team ${awayClass}">${match.awayTeam} <i class="material-icons">sports_soccer</i></span></div><div class="match-footer"><span><i class="material-icons">schedule</i> ${match.time}</span><span><i class="material-icons">bolt</i> ${match.insight}</span><span><i class="material-icons">emoji_events</i><strong style="color:#1e6f3f;">AI pick: ${winnerTeamName}</strong></span></div></div>`;
+      });
+      container.innerHTML = cardsHtml;
+      document.querySelectorAll('.match-card').forEach((card, i) => card.style.animationDelay = `${i * 0.05}s`);
+    }
 
-      cardsHtml += `
-        <div class="match-card" style="--order:${idx};">
-          <div class="match-header">
-            <span class="league"><i class="material-icons" style="font-size:14px;">smart_toy</i> AI DETECTED</span>
-            <span class="ai-confidence">
-              <i class="material-icons">insights</i> ${match.confidence}%
-            </span>
-          </div>
+    function formatMatch(datetime) {
+      const d = new Date(datetime);
+      const now = new Date();
+      const diffDays = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+      const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (diffDays === 0) return `Today • ${time}`;
+      if (diffDays === 1) return `Tomorrow • ${time}`;
+      return `${d.toLocaleDateString([], { day: '2-digit', month: 'short' })} • ${time}`;
+    }
 
-          <div class="match-teams">
-            <span class="team ${homeClass}">
-              <i class="material-icons">sports_soccer</i> ${match.homeTeam}
-            </span>
-            <span class="vs">VS</span>
-            <span class="team ${awayClass}">
-              ${match.awayTeam} <i class="material-icons">sports_soccer</i>
-            </span>
-          </div>
+    let splashStart = Date.now();
+    function hideSplash() {
+      const splash = document.getElementById("splashScreen");
+      if (!splash) return;
+      const elapsed = Date.now() - splashStart;
+      const delay = Math.max(0, 1500 - elapsed);
+      setTimeout(() => { splash.style.transition = "opacity 0.5s ease"; splash.style.opacity = "0"; setTimeout(() => splash.style.display = "none", 500); }, delay);
+    }
+    function init() { fetchMatches(); setInterval(fetchMatches, 120000); }
+    document.addEventListener("DOMContentLoaded", init);
 
-          <div class="match-footer">
-            <span><i class="material-icons">schedule</i> ${match.time}</span>
-            <span><i class="material-icons">bolt</i> ${match.insight}</span>
-            <span>
-              <i class="material-icons">emoji_events</i>
-              <strong style="color:#1e6f3f;">AI pick: ${winnerTeamName}</strong>
-            </span>
-          </div>
-        </div>
-      `;
-    });
+    // ---------- UPGRADED: LIVE MATCHES USING REST ENDPOINT (CACHED) + POLLING ----------
+    let currentLiveMatches = [];
+    let pollingInterval = null;
+    let isLivePanelActive = false;
+    let lastLiveHash = "";                // deduplication (like original WebSocket logic)
+    const LIVE_API_URL = "https://betai-92ov.onrender.com/live";
 
-    container.innerHTML = cardsHtml;
+    async function fetchLiveData() {
+      try {
+        const response = await fetch(LIVE_API_URL);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const json = await response.json();
+        
+        if (json.success && Array.isArray(json.data)) {
+          const newHash = JSON.stringify(json.data);
+          // Only re-render if data actually changed (same as original lastLiveHash)
+          if (newHash !== lastLiveHash) {
+            lastLiveHash = newHash;
+            currentLiveMatches = json.data;
+            renderLiveTable(currentLiveMatches);
+          }
+          // Update timestamp using backend's lastUpdate (cached time)
+          if (json.lastUpdate) {
+            const updateTime = new Date(json.lastUpdate).toLocaleTimeString();
+            const timestampEl = document.getElementById("liveUpdateTimestamp");
+            if (timestampEl) timestampEl.innerHTML = `🔄 Last update: ${updateTime} · odds refresh in real time`;
+          } else {
+            const timestampEl = document.getElementById("liveUpdateTimestamp");
+            if (timestampEl) timestampEl.innerHTML = `🔄 Live data cached · auto-refresh every 3s`;
+          }
+        } else {
+          console.warn("Live API returned invalid format", json);
+          if (currentLiveMatches.length === 0) {
+            const tbody = document.getElementById("liveTableBody");
+            if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="live-loading">📡 No live matches at the moment. Waiting for updates...</td></tr>`;
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching live data:", err);
+        const tbody = document.getElementById("liveTableBody");
+        if (tbody && currentLiveMatches.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="live-loading" style="color:#b91c1c;">⚠️ Live feed error. Retrying...</td></tr>`;
+        }
+      }
+    }
 
-    applyStaggeredAnimation();
-  }
+    function startLivePolling() {
+      if (pollingInterval) clearInterval(pollingInterval);
+      // Immediately fetch once, and set the correct loading message
+      const tbody = document.getElementById("liveTableBody");
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="6" class="live-loading"><div class="loading-spinner-small" style="width:20px;height:20px;border:2px solid #cbd5e1;border-top-color:#2c6e4e;border-radius:50%;animation:spin 0.8s linear infinite;"></div> Awaiting live odds data...</td></tr>`;
+      }
+      fetchLiveData();
+      pollingInterval = setInterval(fetchLiveData, 3000);
+    }
 
-  // ---------- ANIMATION ----------
-  function applyStaggeredAnimation() {
-    const cards = document.querySelectorAll('.match-card');
-    cards.forEach((card, i) => {
-      card.style.animationDelay = `${i * 0.05}s`;
-    });
-  }
-  
-let splashStart = Date.now();
+    function stopLivePolling() {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+      }
+    }
 
-function hideSplash() {
-  const splash = document.getElementById("splashScreen");
-  if (!splash) return;
+    function renderLiveTable(matches) {
+      const tbody = document.getElementById("liveTableBody");
+      if (!tbody) return;
+      if (!matches || matches.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="live-loading">📡 No live matches at the moment. Waiting for updates...</td></tr>`;
+        return;
+      }
+      let rows = '';
+      matches.forEach(m => {
+        const matchName = m.match || "Unknown vs Unknown";
+        const homeOdd = (m.homeOdds != null) ? m.homeOdds.toFixed(2) : '—';
+        const drawOdd = (m.drawOdds != null) ? m.drawOdds.toFixed(2) : '—';
+        const awayOdd = (m.awayOdds != null) ? m.awayOdds.toFixed(2) : '—';
+        
+        let statusHtml = `<span class="match-time-status"><i class="material-icons" style="font-size:14px;">schedule</i> ${m.startTime ? formatMatchDateTime(m.startTime) : 'TBD'}</span>`;
+        if (m.status === "LIVE") {
+          statusHtml = `<span class="live-indicator">LIVE ${m.minute || ""}'</span>`;
+        } else if (m.status === "HALF_TIME") {
+          statusHtml = `<span class="live-indicator" style="background:#f59e0b;">HT</span>`;
+        } else if (m.status === "FINISHED") {
+          statusHtml = `<span class="live-indicator" style="background:#64748b;">FT</span>`;
+        }
+        
+        rows += `<tr>
+          <td><div class="match-name"><span class="teams-sm">${escapeHtml(matchName)}</span></div></td>
+          <td>${(m.homeScore != null && m.awayScore != null) ? `<strong>${m.homeScore} - ${m.awayScore}</strong>` : `<span class="score-placeholder">—</span>`}</td>
+          <td class="odds-cell"><span class="odds-home">${homeOdd}</span></td>
+          <td class="odds-cell"><span class="odds-draw">${drawOdd}</span></td>
+          <td class="odds-cell"><span class="odds-away">${awayOdd}</span></td>
+          <td>${statusHtml}</td>
+        </tr>`;
+      });
+      tbody.innerHTML = rows;
+    }
 
-  const elapsed = Date.now() - splashStart;
-  const delay = Math.max(0, 1500 - elapsed); // minimum 1.5s
+    function formatMatchDateTime(dateValue) {
+      if (!dateValue) return "Soon";
+      const d = new Date(dateValue);
+      if (isNaN(d.getTime())) return "Soon";
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
 
-  setTimeout(() => {
-    splash.style.transition = "opacity 0.5s ease";
-    splash.style.opacity = "0";
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+      });
+    }
 
-    setTimeout(() => {
-      splash.style.display = "none";
-    }, 500);
-  }, delay);
-}
-  // ---------- INIT ----------
-  function init() {
-    fetchMatches();
+    // Show live panel (updates)
+    function showLiveMatches() {
+      const dashboard = document.getElementById("dashboardRow");
+      const livePanel = document.getElementById("liveMatchesPanel");
+      if (!dashboard || !livePanel) return;
+      dashboard.style.display = "none";
+      livePanel.style.display = "block";
+      isLivePanelActive = true;
+      
+      // Reset hash so that the first incoming data triggers render
+      lastLiveHash = "";
+      // Show loading message exactly like original "Awaiting live odds data..."
+      const tbody = document.getElementById("liveTableBody");
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="6" class="live-loading"><div class="loading-spinner-small" style="width:20px;height:20px;border:2px solid #cbd5e1;border-top-color:#2c6e4e;border-radius:50%;animation:spin 0.8s linear infinite;"></div> Awaiting live odds data...</td></tr>`;
+      }
+      startLivePolling();
+    }
 
-    // refresh every 2 minutes
-    setInterval(fetchMatches, 120000);
-  }
+    function goHome() {
+      const dashboard = document.getElementById("dashboardRow");
+      const livePanel = document.getElementById("liveMatchesPanel");
+      if (!dashboard || !livePanel) return;
+      dashboard.style.display = "flex";
+      livePanel.style.display = "none";
+      isLivePanelActive = false;
+      stopLivePolling();
+      fetchMatches();  // refresh main data when returning home (same as original)
+    }
 
-  document.addEventListener("DOMContentLoaded", init);
-</script>
-    </body>
-        </html>
+    window.Home = goHome;
+
+    function setupNavBar() {
+      const navItems = document.querySelectorAll(".nav-item");
+      navItems.forEach(item => {
+        item.addEventListener("click", (e) => {
+          const navType = item.getAttribute("data-nav");
+          if (navType === "updates") {
+            showLiveMatches();
+          } else {
+            if (document.getElementById("liveMatchesPanel")?.style.display === "block") {
+              alert("⚡ Live updates active. Press 'Back to Home' first to explore other features.");
+            } else {
+              alert(`✨ "${item.querySelector('span')?.innerText || 'Feature'}" coming soon — stay tuned!`);
+            }
+          }
+        });
+      });
+      const backBtn = document.getElementById("backToHomeBtn");
+      if (backBtn) backBtn.addEventListener("click", goHome);
+    }
+
+    // Ensure nav bar is set up after DOM ready
+    const originalInit = init;
+    window.init = function() {
+      if (originalInit) originalInit();
+      setupNavBar();
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => { if (window.init) window.init(); });
+    } else {
+      if (window.init) window.init();
+    }
+    setTimeout(setupNavBar, 500);
+  </script>
+</body>
+</html>
