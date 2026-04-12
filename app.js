@@ -1,19 +1,19 @@
 import express from "express";
 import cors from "cors";
 import http from "http";
-import { WebSocketServer } from "ws";
 import BetwayAPI from "./BetwayApi.js";
 
 const app = express();
 app.use(cors());
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
 const betway = new BetwayAPI();
 
-const clients = new Set();
+// ---------- Cache for live data ----------
+let latestLiveData = null;     // stores the most recent data from the stream
+let lastUpdate = null;         // timestamp of the last update
 
 // ================= HOME =================
 app.get("/", (_, res) => res.send("Betway API Running 🚀"));
@@ -27,47 +27,34 @@ app.get("/matches", async (req, res) => {
     res.status(500).json({ success: false, error: e.message });
   }
 });
-// ================= WEBSOCKET =================
-wss.on("connection", ws => {
-  ws.isAlive = true;
-  clients.add(ws);
 
-  ws.send(JSON.stringify({ type: "connected" }));
-
-  ws.on("pong", () => ws.isAlive = true);
-  ws.on("close", () => clients.delete(ws));
+// ================= LIVE DATA (REST + CACHE) =================
+app.get("/live", (req, res) => {
+  if (latestLiveData === null) {
+    return res.status(503).json({
+      success: false,
+      error: "Live data not yet available, please retry shortly"
+    });
+  }
+  res.json({
+    success: true,
+    data: latestLiveData,
+    lastUpdate: lastUpdate
+  });
 });
 
-// ================= HEARTBEAT =================
-setInterval(() => {
-  clients.forEach(ws => {
-    if (!ws.isAlive) return ws.terminate(), clients.delete(ws);
-    ws.isAlive = false;
-    ws.ping();
-  });
-}, 30000);
-
-// ================= BROADCAST =================
-const broadcast = data => {
-  const msg = JSON.stringify({ type: "live", timestamp: Date.now(), data });
-
-  clients.forEach(ws => {
-    try {
-      if (ws.readyState === 1 && ws.bufferedAmount < 1e6) ws.send(msg);
-    } catch {
-      clients.delete(ws);
-    }
-  });
-};
-
-// ================= STREAM ENGINE =================
+// ================= STREAM ENGINE (UPDATES CACHE) =================
 let stream, restarting = false;
 
 const startStream = () => {
   stream = betway.liveStream({ interval: 3000, useCache: false });
 
   stream.on("open", () => console.log("🟢 Live stream started"));
-  stream.on("message", broadcast);
+  stream.on("message", (data) => {
+    // Update the cache on every new message
+    latestLiveData = data;
+    lastUpdate = Date.now();
+  });
   stream.on("error", e => (console.error("🔴 Stream error:", e.message), restart()));
   stream.on("close", () => (console.log("🟡 Stream closed → restarting..."), restart()));
 };
@@ -88,10 +75,9 @@ const restart = () => {
 
 // ================= INIT =================
 startStream();
-setInterval(restart, 5 * 60 * 1000);
-setInterval(() => console.log(`👥 Clients: ${clients.size}`), 10000);
+setInterval(restart, 5 * 60 * 1000);   // safety restart every 5 minutes
 
-// ================= START =================
+// ================= START SERVER =================
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
