@@ -14,7 +14,6 @@ const PORT = process.env.PORT || 3000;
 const betway = new BetwayAPI();
 
 const clients = new Set();
-let last = null;
 
 // ================= HOME =================
 app.get("/", (_, res) => res.send("Betway API Running 🚀"));
@@ -38,7 +37,7 @@ wss.on("connection", (ws) => {
   ws.on("close", () => clients.delete(ws));
 });
 
-// broadcast helper
+// ================= BROADCAST =================
 const broadcast = (data) => {
   const msg = JSON.stringify({
     type: "live",
@@ -51,62 +50,45 @@ const broadcast = (data) => {
   }
 };
 
-// ================= SHARED LIVE ENGINE =================
-setInterval(async () => {
+// ================= LIVE STREAM ENGINE =================
+let stream;
+
+const startStream = () => {
+  stream = betway.liveStream({
+    interval: 3000,
+    useCache: false // 🔥 ensure real-time
+  });
+
+  stream.on("open", () => {
+    console.log("🟢 Live stream started");
+  });
+
+  stream.on("message", (data) => {
+    broadcast(data);
+  });
+
+  stream.on("error", (err) => {
+    console.error("🔴 Stream error:", err.message);
+  });
+
+  stream.on("close", () => {
+    console.log("🟡 Stream closed");
+  });
+};
+
+// auto-restart safety (optional but smart)
+const restartStream = () => {
   try {
-    const raw = await betway.getUpdates({ Take: 20 });
+    stream?.close();
+  } catch {}
+  startStream();
+};
 
-    const pm = Object.fromEntries(
-      (raw.prices || []).map(p => [p.outcomeId, p.priceDecimal])
-    );
+// start immediately
+startStream();
 
-    const om = (raw.outcomes || []).reduce((a, o) => {
-      (a[o.marketId] ??= []).push(o);
-      return a;
-    }, {});
-
-    const data = (raw.markets || [])
-      .map(m => {
-        const e = raw.events?.find(x => x.eventId === m.eventId);
-        if (!e) return;
-
-        let h, d, a;
-
-        (om[m.marketId] || []).forEach(o => {
-          const v = pm[o.outcomeId];
-          if (!v) return;
-
-          o.name === "Draw" ? d = v :
-          o.name === e.homeTeam ? h = v :
-          o.name === e.awayTeam ? a = v : null;
-        });
-
-        return {
-          id: e.eventId,
-          match: `${e.homeTeam} vs ${e.awayTeam}`,
-          home: h,
-          draw: d,
-          away: a,
-          startTime: e.expectedStartEpoch
-            ? new Date(e.expectedStartEpoch < 1e12
-                ? e.expectedStartEpoch * 1000
-                : e.expectedStartEpoch)
-            : null
-        };
-      })
-      .filter(Boolean);
-
-    const payload = JSON.stringify(data);
-
-    if (payload !== last) {
-      last = payload;
-      broadcast(data);
-    }
-
-  } catch (e) {
-    broadcast({ error: e.message });
-  }
-}, 3000);
+// restart every 5 mins to avoid stale connections
+setInterval(restartStream, 5 * 60 * 1000);
 
 // ================= START =================
 server.listen(PORT, "0.0.0.0", () => {
