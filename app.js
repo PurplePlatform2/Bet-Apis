@@ -28,8 +28,6 @@ app.get("/matches", async (req, res) => {
   }
 });
 // ================= WEBSOCKET =================
-const clients = new Set();
-
 wss.on("connection", ws => {
   ws.isAlive = true;
   clients.add(ws);
