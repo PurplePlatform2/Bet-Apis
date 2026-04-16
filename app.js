@@ -28,6 +28,54 @@ app.get("/matches", async (req, res) => {
   }
 });
 
+// ================= AUTH LOGIN =================
+app.post("/login", express.json(), async (req, res) => {
+  try {
+    const { username, password, sessionMetadata } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        error: "username and password are required"
+      });
+    }
+
+    const data = await betway.login(username, password, sessionMetadata || {});
+
+    res.json({
+      success: true,
+      message: "Login successful",
+      data
+    });
+  } catch (e) {
+    res.status(500).json({
+      success: false,
+      error: e.message
+    });
+  }
+});
+
+
+// ================= ACCOUNT BALANCE =================
+app.get("/balance", async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    const data = await betway.getAccountBalance(userId || null);
+
+    res.json({
+      success: true,
+      data
+    });
+  } catch (e) {
+    res.status(500).json({
+      success: false,
+      error: e.message
+    });
+  }
+});
+
+
 // ================= LIVE DATA (REST + CACHE) =================
 app.get("/live", (req, res) => {
   if (latestLiveData === null) {
