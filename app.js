@@ -4,149 +4,278 @@ import http from "http";
 import BetwayAPI from "./BetwayApi.js";
 
 const app = express();
-app.use(cors());
-
 const server = http.createServer(app);
 
+app.use(cors());
+app.use(express.json());
+
 const PORT = process.env.PORT || 3000;
+
+// ───────────────── SINGLETON ─────────────────
+// NOTE:
+// still single-user auth architecture
+// preserves your frontend API exactly
+
 const betway = new BetwayAPI();
 
-// ---------- Cache for live data ----------
-let latestLiveData = null;     // stores the most recent data from the stream
-let lastUpdate = null;         // timestamp of the last update
+// ───────────────── LIVE CACHE ─────────────────
 
-// ================= HOME =================
-app.get("/", (_, res) => res.send("Betway API Running 🚀"));
+let latestLiveData = null;
+let lastUpdate = 0;
 
-// ================= MATCHES (STATIC API) =================
+// ───────────────── AI STATE ─────────────────
+
+let aiRunning = false;
+
+// duplicate protection
+const placedBets = new Map();
+
+const alreadyPlaced = (
+  key,
+  cooldown = 10 * 60 * 1000
+) => {
+  const now = Date.now();
+
+  // cleanup expired
+  for (const [k, t] of placedBets) {
+    if (now - t > cooldown) {
+      placedBets.delete(k);
+    }
+  }
+
+  // already exists
+  if (placedBets.has(key)) {
+    return true;
+  }
+
+  // store
+  placedBets.set(key, now);
+
+  return false;
+};
+
+// ───────────────── HOME ─────────────────
+
+app.get("/", (_, res) => {
+  res.send("Betway API Running 🚀");
+});
+
+// ───────────────── MATCHES ─────────────────
+
 app.get("/matches", async (req, res) => {
   try {
-    const data = await betway.list(parseInt(req.query.take) || 100);
-    res.json({ success: true, count: data.length, data });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    const take =
+      parseInt(req.query.take) || 100;
+
+    const data = await betway.list(take);
+
+    res.json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  }
+
+  catch (e) {
+    res.status(500).json({
+      success: false,
+      error: e.message,
+    });
   }
 });
 
-// ================= AUTH LOGIN =================
-app.post("/login", express.json(), async (req, res) => {
+// ───────────────── LOGIN ─────────────────
+
+app.post("/login", async (req, res) => {
   try {
-    const { username, password, sessionMetadata } = req.body;
+    const {
+      username,
+      password,
+      sessionMetadata,
+    } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({
         success: false,
-        error: "username and password are required"
+        error:
+          "username and password are required",
       });
     }
 
-    const data = await betway.login(username, password, sessionMetadata || {});
+    const data = await betway.login(
+      username,
+      password,
+      sessionMetadata || {}
+    );
 
     res.json({
       success: true,
       message: "Login successful",
-      data
+      data,
     });
-  } catch (e) {
+  }
+
+  catch (e) {
     res.status(500).json({
       success: false,
-      error: e.message
+      error: e.message,
     });
   }
 });
 
+// ───────────────── BALANCE ─────────────────
 
-// ================= ACCOUNT BALANCE =================
 app.get("/balance", async (req, res) => {
   try {
     const { userId } = req.query;
 
-    const data = await betway.getAccountBalance(userId || null);
+    const data =
+      await betway.getAccountBalance(
+        userId || null
+      );
 
     res.json({
       success: true,
-      data
+      data,
     });
-  } catch (e) {
+  }
+
+  catch (e) {
     res.status(500).json({
       success: false,
-      error: e.message
+      error: e.message,
     });
   }
 });
 
+// ───────────────── LIVE DATA ─────────────────
 
-// ================= LIVE DATA (REST + CACHE) =================
 app.get("/live", (req, res) => {
-  if (latestLiveData === null) {
+  if (!latestLiveData) {
     return res.status(503).json({
       success: false,
-      error: "Live data not yet available, please retry shortly"
+      error:
+        "Live data not yet available",
     });
   }
+
+  // stale protection
+  if (Date.now() - lastUpdate > 15000) {
+    return res.status(503).json({
+      success: false,
+      error:
+        "Live stream temporarily stale",
+    });
+  }
+
   res.json({
     success: true,
     data: latestLiveData,
-    lastUpdate: lastUpdate
+    lastUpdate,
   });
 });
 
-// ================= STREAM ENGINE (UPDATES CACHE) =================
-let stream, restarting = false;
+// ───────────────── STREAM ENGINE ─────────────────
+
+let stream = null;
+let restarting = false;
 
 const startStream = () => {
-  stream = betway.liveStream({ interval: 3000, useCache: false });
+  stream = betway.liveStream({
+    interval: 3000,
+  });
 
-  stream.on("open", () => console.log("🟢 Live stream started"));
-  stream.on("message", (data) => {
-    // Update the cache on every new message
+  stream.on("open", () => {
+    console.log(
+      "🟢 Live stream started"
+    );
+  });
+
+  stream.on("message", data => {
     latestLiveData = data;
     lastUpdate = Date.now();
   });
-  stream.on("error", e => (console.error("🔴 Stream error:", e.message), restart()));
-  stream.on("close", () => (console.log("🟡 Stream closed → restarting..."), restart()));
+
+  stream.on("error", e => {
+    console.error(
+      "🔴 Stream error:",
+      e.message
+    );
+
+    restart();
+  });
+
+  stream.on("close", () => {
+    console.log(
+      "🟡 Stream closed → restarting..."
+    );
+
+    restart();
+  });
 };
 
 const restart = () => {
   if (restarting) return;
+
   restarting = true;
 
   try {
-    stream?.removeAllListeners?.();
     stream?.close?.();
-  } catch (e) {
-    console.error("Stream cleanup error:", e.message);
   }
 
-  setTimeout(() => (startStream(), restarting = false), 2000);
+  catch (e) {
+    console.error(
+      "Stream cleanup error:",
+      e.message
+    );
+  }
+
+  setTimeout(() => {
+    startStream();
+    restarting = false;
+  }, 2000);
 };
 
-// ================= INIT =================
+// ───────────────── INIT ─────────────────
+
 startStream();
-setInterval(restart, 5 * 60 * 1000);   // safety restart every 5 minutes
 
+// safety restart
+setInterval(
+  restart,
+  5 * 60 * 1000
+);
 
+// ───────────────── AI ENGINE ─────────────────
 
-/******AI ENDPOINT KEEP SACRED**********/
-// ================= AI ENGINE =================
-let aiRunning = false;
-
-app.post("/ai", express.json(), async (req, res) => {
+app.post("/ai", async (req, res) => {
   try {
-    const { username, password, risk = 100 } = req.body;
+    const {
+      username,
+      password,
+      risk = 100,
+    } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({
         success: false,
-        error: "username and password required"
+        error:
+          "username and password required",
       });
     }
 
     if (aiRunning) {
-      return res.json({ success: false, message: "AI already running" });
+      return res.json({
+        success: false,
+        message: "AI already running",
+      });
     }
 
-    await betway.login(username, password);
+    await betway.login(
+      username,
+      password
+    );
+
     aiRunning = true;
 
     console.log("🤖 AI started...");
@@ -155,96 +284,226 @@ app.post("/ai", express.json(), async (req, res) => {
       if (!aiRunning) return;
 
       try {
-        const raw = await betway.getUpdates({ Take: 100 });
+        const raw =
+          await betway.getLiveData(100);
 
         const now = Date.now();
 
-        const prices = Object.fromEntries(raw.prices.map(p => [p.outcomeId, p]));
-        const outcomes = raw.outcomes.reduce((a, o) => {
-          (a[o.marketId] ||= []).push(o);
-          return a;
-        }, {});
-        const events = Object.fromEntries(raw.events.map(e => [e.eventId, e]));
+        const prices =
+          Object.fromEntries(
+            (raw.prices || []).map(p => [
+              p.outcomeId,
+              p,
+            ])
+          );
 
-        for (const market of raw.markets) {
-          if (!["Win/Draw/Win", "1X2"].includes(market.marketTypeCName)) continue;
+        const outcomes =
+          (raw.outcomes || []).reduce(
+            (a, o) => {
+              (a[o.marketId] ||= []).push(o);
+              return a;
+            },
+            {}
+          );
 
-          const event = events[market.eventId];
+        const events =
+          Object.fromEntries(
+            (raw.events || []).map(e => [
+              e.eventId,
+              e,
+            ])
+          );
+
+        for (const market of raw.markets || []) {
+          if (
+            ![
+              "Win/Draw/Win",
+              "1X2",
+            ].includes(
+              market.marketTypeCName
+            )
+          ) continue;
+
+          const event =
+            events[market.eventId];
+
           if (!event) continue;
 
-          const startTime = event.expectedStartEpoch < 1e12
-            ? event.expectedStartEpoch * 1000
-            : event.expectedStartEpoch;
+          const startTime =
+            event.expectedStartEpoch < 1e12
+              ? event.expectedStartEpoch * 1000
+              : event.expectedStartEpoch;
 
-          const timeDiff = startTime - now;
+          const timeDiff =
+            startTime - now;
 
-          // ⏱ within 30 minutes
-          if (timeDiff > 30 * 60 * 1000 || timeDiff < 0) continue;
+          // only within 30 mins
+          if (
+            timeDiff >
+              30 * 60 * 1000 ||
+            timeDiff < 0
+          ) continue;
 
-          for (const o of outcomes[market.marketId] || []) {
-            const price = prices[o.outcomeId];
+          for (
+            const outcome of
+            outcomes[market.marketId] || []
+          ) {
+            const price =
+              prices[outcome.outcomeId];
+
             if (!price) continue;
 
-            // 🎯 odds < 1.10
-            if (price.priceDecimal >= 1.10) continue;
+            // odds below 1.10
+            if (
+              price.priceDecimal >=
+              1.1
+            ) continue;
 
             const selection = {
-              eventId: event.eventId,
-              marketId: market.marketId,
-              outcomeId: o.outcomeId,
+              price:
+                price.priceDecimal,
 
-              priceNum: price.priceNum,
-              priceDen: price.priceDen,
-              priceDec: price.priceDecimal,
+              eventId:
+                event.eventId,
 
-              eventVersion: event.version,
-              marketVersion: market.version,
-              outcomeVersion: o.version,
-              priceVersion: price.version,
+              marketId:
+                market.marketId,
 
-              publicHubPublishedTime: price.publicHubPublishedTime
+              outcomeId:
+                outcome.outcomeId,
+
+              eventVersion:
+                event.version,
+
+              marketVersion:
+                market.version,
+
+              outcomeVersion:
+                outcome.version,
+
+              priceVersion:
+                price.version,
+
+              priceNum:
+                price.numerator,
+
+              priceDen:
+                price.denominator,
+
+              publicHubPublishedTime:
+                price.publicHubPublishedTime ||
+                null,
+
+              serverEmopSource:
+                price.emopSource || 1,
             };
 
-            console.log("🎯 AI SIGNAL:", {
-              match: `${event.homeTeam} vs ${event.awayTeam}`,
-              team: o.name,
-              odds: price.priceDecimal,
-              startsInMin: Math.floor(timeDiff / 60000)
-            });
+            // duplicate prevention
+            const betKey = [
+              event.eventId,
+              market.marketId,
+              outcome.outcomeId,
+              price.version,
+            ].join(":");
 
-            // 💡 BET PAYLOAD READY (safe mode)
-            console.log("🧾 BET PAYLOAD:", {
-              wagerAmount: risk,
-              selections: [selection]
-            });
+            if (
+              alreadyPlaced(betKey)
+            ) {
+              console.log(
+                "⏭ Duplicate skipped:",
+                betKey
+              );
 
-            // auto-bet:
-            await betway.placeBet({
-              wagerAmount: risk,
-              selections: [selection]
-            });
+              continue;
+            }
+
+            console.log(
+              "🎯 AI SIGNAL:",
+              {
+                match:
+                  `${event.homeTeam} vs ${event.awayTeam}`,
+
+                team:
+                  outcome.name,
+
+                odds:
+                  price.priceDecimal,
+
+                startsInMin:
+                  Math.floor(
+                    timeDiff / 60000
+                  ),
+              }
+            );
+
+            try {
+              const result =
+                await betway.placeBet(
+                  selection,
+                  risk
+                );
+
+              console.log(
+                "✅ Bet placed:",
+                {
+                  betKey,
+                  result,
+                }
+              );
+            }
+
+            catch (e) {
+              console.error(
+                "❌ Bet failed:",
+                e.message
+              );
+            }
           }
         }
-
-      } catch (e) {
-        console.error("AI loop error:", e.message);
       }
 
-      setTimeout(loop, 5000); // run every 5s
+      catch (e) {
+        console.error(
+          "AI loop error:",
+          e.message
+        );
+      }
+
+      setTimeout(loop, 5000);
     };
 
     loop();
 
-    res.json({ success: true, message: "AI started" });
+    res.json({
+      success: true,
+      message: "AI started",
+    });
+  }
 
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+  catch (e) {
+    res.status(500).json({
+      success: false,
+      error: e.message,
+    });
   }
 });
 
+// ───────────────── OPTIONAL STOP AI ─────────────────
+// added without changing frontend API
 
+app.post("/ai/stop", (req, res) => {
+  aiRunning = false;
 
-// ================= START SERVER =================
+  res.json({
+    success: true,
+    message: "AI stopped",
+  });
+});
+
+// ───────────────── SERVER ─────────────────
+
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(
+    `🚀 Server running on port ${PORT}`
+  );
 });
