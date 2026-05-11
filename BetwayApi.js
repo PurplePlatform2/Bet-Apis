@@ -58,21 +58,30 @@ class BetwayAPI {
     }
   }
 
-  _qs(base, params = {}) {
-    const s = new URLSearchParams();
+_qs(base, params = {}) {
+  const s = new URLSearchParams();
 
-    for (const [k, v] of Object.entries(params)) {
-      if (v == null) continue;
+  for (const [k, v] of Object.entries(params)) {
+    if (v == null) continue;
 
-      if (Array.isArray(v)) {
-        for (const x of v) s.append(k, x);
-      } else {
-        s.append(k, typeof v === "boolean" ? +v : v);
+    if (Array.isArray(v)) {
+      for (const x of v) {
+        s.append(k, x);
       }
     }
 
-    return `${base}?${s}`;
+    else if (typeof v === "boolean") {
+      s.append(k, String(v));
+    }
+
+    else {
+      s.append(k, v);
+    }
   }
+
+  return `${base}?${s}`;
+}
+
 
   _headers(extra = {}) {
     return {
