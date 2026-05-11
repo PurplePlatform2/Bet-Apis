@@ -1,0 +1,175 @@
+name: Advanced Keepalive Bot
+
+on:
+  schedule:
+    # Runs every 13 minutes
+    - cron: "*/13 * * * *"
+  workflow_dispatch:
+
+# Prevent overlapping runs
+concurrency:
+  group: keepalive-bot
+  cancel-in-progress: true
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm init -y
+          npm install puppeteer
+
+      - name: Run smart keepalive session
+        env:
+          TARGET_URL: https://betai-92ov.onrender.com/
+        run: |
+          node <<'EOF'
+          const puppeteer = require('puppeteer');
+
+          const random = (min, max) =>
+            Math.floor(Math.random() * (max - min + 1)) + min;
+
+          const delay = (ms) =>
+            new Promise(resolve => setTimeout(resolve, ms));
+
+          (async () => {
+            let browser;
+
+            try {
+              browser = await puppeteer.launch({
+                headless: "new",
+                args: [
+                  "--no-sandbox",
+                  "--disable-setuid-sandbox",
+                  "--disable-dev-shm-usage",
+                  "--disable-blink-features=AutomationControlled"
+                ],
+                defaultViewport: null
+              });
+
+              const page = await browser.newPage();
+
+              // Realistic desktop browser profile
+              await page.setViewport({
+                width: random(1280, 1920),
+                height: random(720, 1080),
+                deviceScaleFactor: 1
+              });
+
+              // Random user agents
+              const userAgents = [
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+              ];
+
+              await page.setUserAgent(
+                userAgents[random(0, userAgents.length - 1)]
+              );
+
+              // Hide automation fingerprints
+              await page.evaluateOnNewDocument(() => {
+                Object.defineProperty(navigator, 'webdriver', {
+                  get: () => false
+                });
+
+                window.chrome = {
+                  runtime: {}
+                };
+
+                Object.defineProperty(navigator, 'plugins', {
+                  get: () => [1, 2, 3, 4, 5]
+                });
+
+                Object.defineProperty(navigator, 'languages', {
+                  get: () => ['en-US', 'en']
+                });
+              });
+
+              console.log("Opening target:", process.env.TARGET_URL);
+
+              await page.goto(process.env.TARGET_URL, {
+                waitUntil: "domcontentloaded",
+                timeout: 60000
+              });
+
+              // Initial human pause
+              await delay(random(1500, 3500));
+
+              // Human-like scrolling
+              const scrollRounds = random(4, 8);
+
+              for (let i = 0; i < scrollRounds; i++) {
+                const distance = random(200, 700);
+
+                await page.evaluate((dist) => {
+                  window.scrollBy({
+                    top: dist,
+                    behavior: "smooth"
+                  });
+                }, distance);
+
+                await delay(random(800, 2500));
+              }
+
+              // Sometimes scroll back up
+              if (Math.random() > 0.5) {
+                await page.evaluate(() => {
+                  window.scrollTo({
+                    top: 0,
+                    behavior: "smooth"
+                  });
+                });
+
+                await delay(random(1000, 2500));
+              }
+
+              // Random mouse movement
+              for (let i = 0; i < 5; i++) {
+                await page.mouse.move(
+                  random(0, 1200),
+                  random(0, 800),
+                  { steps: random(5, 20) }
+                );
+
+                await delay(random(300, 1000));
+              }
+
+              // Optional click on body
+              try {
+                await page.mouse.click(
+                  random(100, 800),
+                  random(100, 600)
+                );
+              } catch {}
+
+              // Final idle time
+              await delay(random(3000, 6000));
+
+              console.log("Keepalive session completed successfully.");
+            } catch (err) {
+              console.error("Keepalive failed:");
+              console.error(err);
+              process.exit(1);
+            } finally {
+              if (browser) {
+                await browser.close();
+              }
+            }
+          })();
+          EOF
