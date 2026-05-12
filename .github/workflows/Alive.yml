@@ -1,28 +1,20 @@
-name: Advanced Keepalive Bot
+name: Ultra Keepalive Bot
 
 on:
   schedule:
-    # Runs every 13 minutes
-    - cron: "*/13 * * * *"
+    - cron: "*/3 * * * *"
   workflow_dispatch:
 
-# Prevent overlapping runs
 concurrency:
-  group: keepalive-bot
-  cancel-in-progress: true
+  group: ultra-keepalive
+  cancel-in-progress: false
 
 jobs:
   keepalive:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    strategy:
-      fail-fast: false
+    timeout-minutes: 15
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -33,142 +25,142 @@ jobs:
           npm init -y
           npm install puppeteer
 
-      - name: Run smart keepalive session
+      - name: Run Keepalive Engine
         env:
           TARGET_URL: https://betai-92ov.onrender.com/
         run: |
           node <<'EOF'
-          const puppeteer = require('puppeteer');
+          const puppeteer = require("puppeteer");
 
           const random = (min, max) =>
             Math.floor(Math.random() * (max - min + 1)) + min;
 
-          const delay = (ms) =>
-            new Promise(resolve => setTimeout(resolve, ms));
+          const delay = ms =>
+            new Promise(r => setTimeout(r, ms));
 
-          (async () => {
+          const profiles = [
+            {
+              os: "Windows",
+              ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"
+            },
+            {
+              os: "Linux",
+              ua: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/123.0.0.0 Safari/537.36"
+            },
+            {
+              os: "Mac",
+              ua: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"
+            }
+          ];
+
+          async function run() {
             let browser;
 
             try {
+              const profile =
+                profiles[random(0, profiles.length - 1)];
+
+              console.log("================================");
+              console.log("KEEPALIVE STARTED");
+              console.log("Time:", new Date().toISOString());
+              console.log("OS:", profile.os);
+              console.log("================================");
+
               browser = await puppeteer.launch({
                 headless: "new",
                 args: [
                   "--no-sandbox",
                   "--disable-setuid-sandbox",
-                  "--disable-dev-shm-usage",
-                  "--disable-blink-features=AutomationControlled"
-                ],
-                defaultViewport: null
+                  "--disable-dev-shm-usage"
+                ]
               });
 
               const page = await browser.newPage();
 
-              // Realistic desktop browser profile
+              await page.setUserAgent(profile.ua);
+
               await page.setViewport({
-                width: random(1280, 1920),
-                height: random(720, 1080),
-                deviceScaleFactor: 1
+                width: random(1200, 1920),
+                height: random(700, 1080)
               });
 
-              // Random user agents
-              const userAgents = [
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-              ];
-
-              await page.setUserAgent(
-                userAgents[random(0, userAgents.length - 1)]
-              );
-
-              // Hide automation fingerprints
               await page.evaluateOnNewDocument(() => {
                 Object.defineProperty(navigator, 'webdriver', {
                   get: () => false
                 });
 
-                window.chrome = {
-                  runtime: {}
-                };
-
-                Object.defineProperty(navigator, 'plugins', {
-                  get: () => [1, 2, 3, 4, 5]
-                });
-
                 Object.defineProperty(navigator, 'languages', {
                   get: () => ['en-US', 'en']
                 });
-              });
 
-              console.log("Opening target:", process.env.TARGET_URL);
-
-              await page.goto(process.env.TARGET_URL, {
-                waitUntil: "domcontentloaded",
-                timeout: 60000
-              });
-
-              // Initial human pause
-              await delay(random(1500, 3500));
-
-              // Human-like scrolling
-              const scrollRounds = random(4, 8);
-
-              for (let i = 0; i < scrollRounds; i++) {
-                const distance = random(200, 700);
-
-                await page.evaluate((dist) => {
-                  window.scrollBy({
-                    top: dist,
-                    behavior: "smooth"
-                  });
-                }, distance);
-
-                await delay(random(800, 2500));
-              }
-
-              // Sometimes scroll back up
-              if (Math.random() > 0.5) {
-                await page.evaluate(() => {
-                  window.scrollTo({
-                    top: 0,
-                    behavior: "smooth"
-                  });
+                Object.defineProperty(navigator, 'plugins', {
+                  get: () => [1,2,3,4]
                 });
+              });
 
-                await delay(random(1000, 2500));
+              console.log("Opening:", process.env.TARGET_URL);
+
+              const response = await page.goto(
+                process.env.TARGET_URL,
+                {
+                  waitUntil: "networkidle2",
+                  timeout: 90000
+                }
+              );
+
+              const status = response.status();
+
+              console.log("HTTP STATUS:", status);
+
+              if (status >= 200 && status < 400) {
+                console.log("SERVER IS ALIVE");
+              } else {
+                console.log("SERVER MAY BE DOWN");
               }
 
-              // Random mouse movement
-              for (let i = 0; i < 5; i++) {
+              // Human simulation
+              for (let i = 0; i < random(3, 8); i++) {
+
                 await page.mouse.move(
                   random(0, 1200),
-                  random(0, 800),
-                  { steps: random(5, 20) }
+                  random(0, 900),
+                  { steps: random(5, 25) }
                 );
 
-                await delay(random(300, 1000));
+                await page.evaluate((y) => {
+                  window.scrollBy({
+                    top: y,
+                    behavior: "smooth"
+                  });
+                }, random(200, 800));
+
+                await delay(random(1000, 4000));
               }
 
-              // Optional click on body
-              try {
-                await page.mouse.click(
-                  random(100, 800),
-                  random(100, 600)
-                );
-              } catch {}
+              // Keep tab open longer
+              console.log("Keeping session active...");
 
-              // Final idle time
-              await delay(random(3000, 6000));
+              await delay(random(30000, 60000));
 
-              console.log("Keepalive session completed successfully.");
-            } catch (err) {
-              console.error("Keepalive failed:");
-              console.error(err);
-              process.exit(1);
-            } finally {
+              console.log("KEEPALIVE SUCCESS");
+            }
+            catch (err) {
+
+              console.log("================================");
+              console.log("KEEPALIVE FAILED");
+              console.log(err.message);
+              console.log("================================");
+
+              process.exitCode = 1;
+            }
+            finally {
               if (browser) {
                 await browser.close();
               }
+
+              console.log("SESSION CLOSED");
             }
-          })();
+          }
+
+          run();
           EOF
