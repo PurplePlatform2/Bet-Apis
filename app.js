@@ -4,12 +4,10 @@ import http from "http";
 import BetwayAPI from "./BetwayApi.js";
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
 const server = http.createServer(app);
-
 const PORT = process.env.PORT || 3000;
 
 const betway = new BetwayAPI();
@@ -35,7 +33,6 @@ let aiRunning = false;
 let aiLoop = null;
 let aiLastRun = 0;
 
-// duplicate protection
 const placedBets = new Map();
 
 const BET_COOLDOWN = 10 * 60 * 1000;
@@ -69,16 +66,9 @@ app.get("/matches", async (req, res) => {
     const take = parseInt(req.query.take) || 100;
     const data = await betway.list(take);
 
-    res.json({
-      success: true,
-      count: data.length,
-      data
-    });
+    res.json({ success: true, count: data.length, data });
   } catch (e) {
-    res.status(500).json({
-      success: false,
-      error: e.message
-    });
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 
@@ -101,16 +91,9 @@ app.post("/login", async (req, res) => {
       sessionMetadata || {}
     );
 
-    res.json({
-      success: true,
-      message: "Login successful",
-      data
-    });
+    res.json({ success: true, message: "Login successful", data });
   } catch (e) {
-    res.status(500).json({
-      success: false,
-      error: e.message
-    });
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 
@@ -118,19 +101,10 @@ app.post("/login", async (req, res) => {
 
 app.get("/balance", async (req, res) => {
   try {
-    const { userId } = req.query;
-
-    const data = await betway.getAccountBalance(userId || null);
-
-    res.json({
-      success: true,
-      data
-    });
+    const data = await betway.getAccountBalance(req.query.userId || null);
+    res.json({ success: true, data });
   } catch (e) {
-    res.status(500).json({
-      success: false,
-      error: e.message
-    });
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 
@@ -151,14 +125,58 @@ app.get("/live", (_, res) => {
   });
 });
 
-// ───────────────── AI CORE RUNNER ─────────────────
-// (extracted from /ai so we can auto-start it)
+// ───────────────── STREAM HELPERS (RESTORED FULLY) ─────────────────
+
+function stopStream() {
+  try {
+    if (stream) {
+      if (typeof stream.close === "function") stream.close();
+      if (typeof stream.terminate === "function") stream.terminate();
+    }
+  } catch (e) {
+    console.error("stopStream error:", e.message);
+  } finally {
+    stream = null;
+    restarting = false;
+  }
+}
+
+function startStream() {
+  try {
+    if (stream) return;
+
+    stream = betway.startStream?.({
+      onData: (data) => {
+        latestLiveData = data;
+        lastUpdate = Date.now();
+      },
+      onError: (err) => {
+        console.error("Stream error:", err);
+        restartStream();
+      }
+    }) || null;
+  } catch (e) {
+    console.error("startStream error:", e.message);
+  }
+}
+
+function restartStream() {
+  if (restarting) return;
+  restarting = true;
+
+  setTimeout(() => {
+    stopStream();
+    startStream();
+    restarting = false;
+  }, 3000);
+}
+
+// ───────────────── AI CORE ─────────────────
 
 async function runAI(username, password, risk = 100) {
   if (aiRunning) return;
 
   await betway.login(username, password);
-
   aiRunning = true;
 
   stopStream();
@@ -194,9 +212,7 @@ async function runAI(username, password, risk = 100) {
         if (!["Win/Draw/Win", "1X2"].includes(market.marketTypeCName)) continue;
 
         const event = events[market.eventId];
-        if (!event) continue;
-
-        if (event.isLive || event.isFinished) continue;
+        if (!event || event.isLive || event.isFinished) continue;
 
         const startTime =
           event.expectedStartEpoch < 1e12
@@ -285,7 +301,7 @@ async function runAI(username, password, risk = 100) {
   loop();
 }
 
-// ───────────────── AI START (UNCHANGED ENDPOINT) ─────────────────
+// ───────────────── AI ENDPOINTS (RESTORED + SAFE) ─────────────────
 
 app.post("/ai", async (req, res) => {
   try {
@@ -299,24 +315,27 @@ app.post("/ai", async (req, res) => {
     }
 
     if (aiRunning) {
-      return res.json({
-        success: false,
-        message: "AI already running"
-      });
+      return res.json({ success: false, message: "AI already running" });
     }
 
     await runAI(username, password, risk);
 
-    res.json({
-      success: true,
-      message: "AI started"
-    });
+    res.json({ success: true, message: "AI started" });
   } catch (e) {
-    res.status(500).json({
-      success: false,
-      error: e.message
-    });
+    res.status(500).json({ success: false, error: e.message });
   }
+});
+
+// ───────────────── STOP AI (RESTORED) ─────────────────
+
+app.post("/ai/stop", (_, res) => {
+  aiRunning = false;
+  if (aiLoop) clearTimeout(aiLoop);
+  aiLoop = null;
+
+  stopStream();
+
+  res.json({ success: true, message: "AI stopped" });
 });
 
 // ───────────────── AUTO START ON BOOT ─────────────────
