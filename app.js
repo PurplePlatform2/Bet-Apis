@@ -178,7 +178,7 @@ async function runAI(username, password, risk = 100) {
 
   await betway.login(username, password);
   aiRunning = true;
-
+  
   stopStream();
 
   console.log("🤖 AI started");
@@ -190,7 +190,7 @@ async function runAI(username, password, risk = 100) {
     }
 
     aiLastRun = Date.now();
-
+    console.log("🤖 AI heartbeat: ", new Date().toISOString());
     try {
       const raw = await betway.getUpdates({ Take: 100 });
       const now = Date.now();
