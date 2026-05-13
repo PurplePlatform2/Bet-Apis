@@ -224,8 +224,8 @@ console.log("login Results::",  loginResults);
 
   for (const game of await betway.list(300)) {    
   //API CHECK
-      if(!game.id || !game.win || !game.loss || !game.datetime)
-      {console.error("Api error at checking a particular game"); continue;}
+      if(!game.id || (!game.win && !game.loss) || !game.datetime)
+      {console.error("Api error at checking a particular game:: ",game.match); continue;}
      
     //CHECKING PEVIOUS   BETS
     const key = `${game.id}:${game.datetime}`;
@@ -235,8 +235,8 @@ console.log("login Results::",  loginResults);
     
 
 let matchVal=null;
-    if (game.win <1.10) matchVal="home";
-    else if( game.loss <1.10) matchVal="away";
+    if (game.win <1.10 && game.win>1.0) matchVal="home";
+    else if( game.loss <1.10 && game.loss>1.0) matchVal="away";
     else continue;
     console.log("\nPotential Oppurtunity📊", game.match, "\nODD:", Math.min(game.win,game.loss));
 
