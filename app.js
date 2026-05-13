@@ -210,8 +210,9 @@ async function runAI(username,password, risk = 100) {
   if (aiRunning) return; aiRunning = true;
 console.log("🤖 AI started... ##Attempting Login-->");
 //Login
-const loginResults=  await betway.login( username,   password  );
-console.log("login Results::",  loginResults);
+try{const loginResults=  await betway.login( username,   password  );
+ console.log(loginResults); } catch(e){ console.error(e);}
+
   
 
   const loop = async () => {
@@ -222,10 +223,10 @@ console.log("login Results::",  loginResults);
   try {
   const now = Date.now();
 
-  for (const game of await betway.list(300)) {    
+  for (const game of await betway.list(50)) {    
   //API CHECK
-      if(!game.id || (!game.win && !game.loss) || !game.datetime)
-      {console.error("Api error at checking a particular game:: ",game.match); continue;}
+      if(!game.id || (!game.win && !game.loss) || !game.datetime) continue;
+    //  {console.error("Api error at checking a particular game:: ",game.match); continue;}
      
     //CHECKING PEVIOUS   BETS
     const key = `${game.id}:${game.datetime}`;
@@ -238,7 +239,7 @@ let matchVal=null;
     if (game.win <1.10 && game.win>1.0) matchVal="home";
     else if( game.loss <1.10 && game.loss>1.0) matchVal="away";
     else continue;
-    console.log("\nPotential Oppurtunity📊", game.match, "\nODD:", Math.min(game.win,game.loss));
+    console.log("\nPotential Oppurtunity📊", game.match, "\nODD:", Math.min(game.win,game.loss), "Time Left= ", diff);
 
       
     if (matchVal!=null &&  diff >=0 && diff <= 1800000) {
