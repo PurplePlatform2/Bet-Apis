@@ -236,8 +236,8 @@ try{const loginResults=  await betway.login( username,   password  );
     
 
 let matchVal=null;
-    if (game.win <1.10 && game.win>1.0) matchVal="home";
-    else if( game.loss <1.10 && game.loss>1.0) matchVal="away";
+    if (game.win <=1.05 && game.win>1.0) matchVal="home";
+    else if( game.loss <=1.05 && game.loss>1.0) matchVal="away";
     else continue;
     console.log("\nPotential Oppurtunity📊", game.match, "\nODD:", Math.min(game.win,game.loss), "Time Left= ", diff);
 
