@@ -207,15 +207,19 @@ app.get("/live", (req, res) => {
 // ───────────────── AI LOOP ─────────────────
 
 async function runAI(username,password, risk = 100) {
+
+ 
   if (aiRunning) return; aiRunning = true;
 console.log("🤖 AI started... ##Attempting Login-->");
-//Login
+/*Login
 try{const loginResults=  await betway.login( username,   password  );
  console.log(loginResults); } catch(e){ console.error(e);}
 
-  
+  */
 
   const loop = async () => {
+
+/*OLD VERSION CODE 
     if (!aiRunning) return;
     aiLastRun = Date.now();
     console.log(   "🤖 AI checking:",  aiLastRun);
@@ -262,11 +266,13 @@ let matchVal=null;
 }
 
 aiLoop = setTimeout(loop, AI_INTERVAL);
-
+*/
+    
 };
 
+
 loop();  
-}
+} 
 
 // ───────────────── START AI ─────────────────
 
