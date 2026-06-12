@@ -205,74 +205,22 @@ app.get("/live", (req, res) => {
 });
 
 // ───────────────── AI LOOP ─────────────────
+import { spawn } from "child_process";
+let liverProc;
 
 async function runAI(username,password, risk = 100) {
-
- 
-  if (aiRunning) return; aiRunning = true;
 console.log("🤖 AI started... ##Attempting Login-->");
-/*Login
-try{const loginResults=  await betway.login( username,   password  );
- console.log(loginResults); } catch(e){ console.error(e);}
+if (aiRunning) return;
+  aiRunning = true;
 
-  */
-
-  const loop = async () => {
-
-/*OLD VERSION CODE 
-    if (!aiRunning) return;
-    aiLastRun = Date.now();
-    console.log(   "🤖 AI checking:",  aiLastRun);
-
-  try {
-  const now = Date.now();
-
-  for (const game of await betway.list(50)) {    
-  //API CHECK
-      if(!game.id || (!game.win && !game.loss) || !game.datetime) continue;
-    //  {console.error("Api error at checking a particular game:: ",game.match); continue;}
-     
-    //CHECKING PEVIOUS   BETS
-    const key = `${game.id}:${game.datetime}`;
-    if(placedBets.has(key))continue;
-    const diff = new Date(game.datetime) - now;
-    if(isNaN(diff)){console.error("DateTime conversion error"); continue;}
-    
-
-let matchVal=null;
-    if (game.win <=1.05 && game.win>1.0) matchVal="home";
-    else if( game.loss <=1.05 && game.loss>1.0) matchVal="away";
-    else continue;
-    console.log("\nPotential Oppurtunity📊", game.match, "\nODD:", Math.min(game.win,game.loss), "Time Left= ", diff);
-
-      
-    if (matchVal!=null &&  diff >=0 && diff <= 1800000) {
-      try {
-        const result = await betway.placeBetWithId(risk, game.id, matchVal);
-        placedBets.add(key);
-        console.log("⚡ BET PLACED:", game.match);
-        console.log("API RESULT:: ", result);
-
-      } catch (e) {
-        console.error("❌ Bet failed:", e.message);
-      }
-    }
-  }
-
-  
-
-} catch (e) {
-  console.error("❌ AI loop error:", e.message);
+  liverProc = spawn("./liver", {
+    stdio: "inherit"
+  });
 }
 
-aiLoop = setTimeout(loop, AI_INTERVAL);
-*/
-    
-};
-
-
-loop();  
 } 
+ 
+  
 
 // ───────────────── START AI ─────────────────
 
