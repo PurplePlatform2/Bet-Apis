@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import http from "http";
 import BetwayAPI from "./BetwayApi.js";
+import { spawn } from "child_process";
+
 
 const app = express();
 
@@ -32,7 +34,7 @@ let liveClients = 0;
 let aiRunning = false;
 let aiLoop = null;
 let aiLastRun = null;
-
+let liverProc=null;
 const placedBets = new Set();
 const AI_INTERVAL = 60 * 1000;
 
@@ -204,22 +206,43 @@ app.get("/live", (req, res) => {
   });
 });
 
-// ───────────────── AI LOOP ─────────────────
-import { spawn } from "child_process";
-let liverProc;
 
-async function runAI(username,password, risk = 100) {
-console.log("🤖 AI started... ##Attempting Login-->");
-if (aiRunning) return;
+// ───────────────── AI LOOP ─────────────────
+
+async function runAI(username, password, risk = 100) {
+  console.log(
+    "🤖 AI started... ##Attempting Login-->"
+  );
+
+  if (aiRunning) return;
+
   aiRunning = true;
+  aiLastRun = Date.now();
 
   liverProc = spawn("./liver", {
     stdio: "inherit"
   });
-}
 
-} 
- 
+  liverProc.on("error", err => {
+    console.error(
+      "❌ liver failed:",
+      err.message
+    );
+
+    aiRunning = false;
+    liverProc = null;
+  });
+
+  liverProc.on("exit", code => {
+    console.log(
+      "📴 liver exited:",
+      code
+    );
+
+    aiRunning = false;
+    liverProc = null;
+  });
+}
   
 
 // ───────────────── START AI ─────────────────
@@ -267,6 +290,7 @@ app.post("/ai", async (req, res) => {
   }
 });
 
+
 // ───────────────── STOP AI ─────────────────
 
 app.post("/ai/stop", (_, res) => {
@@ -277,6 +301,11 @@ app.post("/ai/stop", (_, res) => {
   }
 
   aiLoop = null;
+
+  if (liverProc) {
+    liverProc.kill("SIGTERM");
+    liverProc = null;
+  }
 
   res.json({
     success: true,
